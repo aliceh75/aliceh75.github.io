@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Alice/Development Notes &mdash; Implementing a CKAN authenticator plugin</title>
+    <meta charset="utf-8"/>
+    <link rel="stylesheet" type="text/css" href="http://aliceh75.github.io/theme/css/style.css"/>
+</head>
+
+<body>
+    <div id="container">
+        <div id="header">
+                <div id="site-title"><a href="http://aliceh75.github.io">Alice/Development Notes</a></div>
+        </div>
+
+        <div id="contents">
+    <div class="post">
+        <div class="entry-meta">
+            <div class="date">Mon 23 June 2014</div>
+            <div class="author">By Alice Heaton</div>
+                <div class="tag-list">
+                        <a href="http://aliceh75.github.io/tag/ckan" rel="tag">#ckan</a>
+                </div>
+        </div>
+        <div class="entry-main">
+            <h1 class="entry-title">
+                <a href="http://aliceh75.github.io/implementing-ckan-authenticator-plugin" title="Implementing a CKAN authenticator plugin"
+                   rel="bookmark">Implementing a CKAN authenticator plugin</a>
+            </h1>
+            <div class="entry-content">
+                  <h2>Overview</h2>
+<p><a href="http://ckan.org">CKAN</a> allows plugin writters to provide their own authenticators, allowing people to log in to their CKAN instance using a variety of mechanism (OAuth, OpenID, etc.). CKAN actually offers two different methods for implementing authenticator methods - one based on the <a href="http://docs.repoze.org/who/2.0/">repoze.who WSGI authentication middleware</a>, and one based on their own <a href="http://docs.ckan.org/en/latest/extensions/plugin-interfaces.html#ckan.plugins.interfaces.IAuthenticator"><code>IAuthenticator</code></a> plugin interface.</p>
+<p>Here I describe how I implemented <a href="http://github.com/NaturalHistoryMuseum/ckanext-ldap">ckanext-ldap</a>, a plugin that provides an LDAP authentication method for CKAN using the <code>IAuthenticator</code> method.</p>
+<p>Note: This was implemented for CKAN 2.2. CKAN is a rapidly evolving project, so not all of this may apply to more recent versions.</p>
+<h2>Login form</h2>
+<p>For this plugin we want to allow users to use their LDAP account, but we also want to allow external users to create accounts and use those (this option can be switched off in the configuration). For ease of use we want a single form that can check both against the LDAP database and CKAN's database.</p>
+<p>CKAN makes it easy to override the login form - indeed that is something that an authenticator plugin must do anyway as a form submitted by the standard login form does not call <code>IAuthenticator</code> methods.</p>
+<p>To override the login template form we create our own template file (with the same subpath) at <code>ckanext/ldap/templates/user/login.html</code> and add that as a resource by implementing the <code>IConfigurer</code> interface in our plugin. The template we create is a copy of the CKAN login form - we just change the action to take us to our own controller mapped to '/ldap_loggin_handler'.</p>
+<p>Here is the plugin.py that performs both of these:</p>
+<div class="highlight"><pre><span class="kn">import</span> <span class="nn">ckan.plugins</span> <span class="kn">as</span> <span class="nn">p</span>
+
+<span class="k">class</span> <span class="nc">LdapPlugin</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">SingletonPlugin</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;&quot;LdapPlugin</span>
+
+<span class="sd">    This plugin provides Ldap authentication by implementing the IAuthenticator</span>
+<span class="sd">    interface.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">p</span><span class="o">.</span><span class="n">implements</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">IConfigurer</span><span class="p">)</span>
+<span class="n">p</span><span class="o">.</span><span class="n">implements</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">IRoutes</span><span class="p">,</span> <span class="n">inherit</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">update_config</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">config</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Implement IConfiguer.update_config</span>
+
+<span class="sd">        Add our custom template to the list of templates so we can override the login form.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">toolkit</span><span class="o">.</span><span class="n">add_template_directory</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="s">&#39;templates&#39;</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">before_map</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="nb">map</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Implements Iroutes</span>
+
+<span class="sd">        Add our custom login form handler&quot;&quot;&quot;</span>
+        <span class="nb">map</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="s">&#39;/ldap_loggin_handler&#39;</span><span class="p">,</span>
+                    <span class="n">controller</span><span class="o">=</span><span class="s">&#39;ckanext.ldap.controllers.user:UserController&#39;</span><span class="p">,</span>
+                    <span class="n">action</span><span class="o">=</span><span class="s">&#39;login_handler&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">map</span>
+</pre></div>
+
+
+<h2>Configuration</h2>
+<p>As a quick side note: rather than access the main configuration from our plugin, we implement <code>p.IConfigrable</code> and copy locally the configuration settings. This also allows us to check for missing settings, etc. so that the rest of the plugin can count on the settings being as expected. This is the implementation of <code>IConfigurable.configure</code> in <code>plugin.py</code>:</p>
+<div class="highlight"><pre><span class="k">def</span> <span class="nf">configure</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">main_config</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Implementation of IConfigurable.configure&quot;&quot;&quot;</span>
+    <span class="c"># Check for required items</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="p">[</span><span class="s">&#39;ldap.uri&#39;</span><span class="p">,</span> <span class="s">&#39;ldap.base_dn&#39;</span><span class="p">,</span> <span class="s">&#39;ldap.search.filter&#39;</span><span class="p">,</span> <span class="s">&#39;ldap.username&#39;</span><span class="p">]:</span>
+        <span class="k">if</span> <span class="n">i</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">config</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">MissingConfigError</span><span class="p">(</span><span class="s">&#39;Configuration parameter {} is required&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">i</span><span class="p">))</span>
+    <span class="c"># Copy config</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="p">[</span><span class="s">&#39;ldap.uri&#39;</span><span class="p">,</span> <span class="s">&#39;ldap.auth.dn&#39;</span><span class="p">,</span> <span class="s">&#39;ldap.auth.password&#39;</span><span class="p">,</span> <span class="s">&#39;ldap.base_dn&#39;</span><span class="p">,</span> <span class="s">&#39;ldap.search.filter&#39;</span><span class="p">,</span>
+              <span class="s">&#39;ldap.search.alt&#39;</span><span class="p">,</span> <span class="s">&#39;ldap.search.alt_msg&#39;</span><span class="p">,</span> <span class="s">&#39;ldap.username&#39;</span><span class="p">,</span> <span class="s">&#39;ldap.fullname&#39;</span><span class="p">,</span> <span class="s">&#39;ldap.email&#39;</span><span class="p">,</span>
+              <span class="s">&#39;ldap.organization.id&#39;</span><span class="p">,</span> <span class="s">&#39;ldap.organization.role&#39;</span><span class="p">]:</span>
+        <span class="n">config</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">main_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
+</pre></div>
+
+
+<h2>Login</h2>
+<p>The login process happens in our controller, <code>ckanext.ldap.controllers.user.UserContoller</code> in the <code>login_handler</code> action.</p>
+<p>The <code>IAuthenticator</code> interface provides the following workflow:</p>
+<ul>
+<li>
+<p>First, <code>login</code> is called when the <code>/user/login</code> page is accessed. This is usefull if you want to log users on a redirect, for instance when using OpenId. In our case we want users to log in via the normal login form, so we do not implement this;</p>
+</li>
+<li>
+<p>Second, <code>identify</code> is called. We will use this to look up the LDAP database, and create or assign the user if needed.</p>
+</li>
+</ul>
+<h2>Login form</h2>
+<p>The first thing to note is that when you implement an authenticator, the authentication data you get (username, keys, etc.) is expected to come from an external source. This makes it easy to implement authenticators that log you in after a redirect - for instance when using OpenId.</p>
+<p>In our case however we want the user to enter their username and password from the CKAN interface - we will then contact the LDAP database. This means we must implement our own login form. This could be usefull anyway in the future if we wanted to handle multiple LDAP domains - though at this time the plugin does not support this.</p>
+<h2>The IAuthenticator interface</h2>
+<p>I will assume you are familiar with writing CKAN extensions - if not, have a look at <a href="http://docs.ckan.org/en/ckan-2.2/extensions/index.html">the documentation on writing CKAN extensions</a>. The <code>IAuthenticator</code> interface provides four methods:</p>
+            </div>
+        </div>
+    </div>
+        </div>
+
+        <div id="footer">
+            <p>Alice online: <a href="http://github.com/aliceh75">GitHub</a> <a href="https://twitter.com/aliceheaton75">Twitter</a></p>
+            <p>Site generated by <a href="http://pelican.readthedocs.org">Pelican</a>, theme loosely based on <a href="https://github.com/tbunnyman/pelican-chunk">Chunk</a></p>
+            <p>All content by Alice Heaton, licensed under a <a rel="license" href="http://creativecommons.org/licenses/by-sa/4.0/">Creative Commons Attribution-ShareAlike 4.0 International License</a>
+               <a rel="license" href="http://creativecommons.org/licenses/by-sa/4.0/"><img alt="Creative Commons Licence" style="border-width:0" src="http://i.creativecommons.org/l/by-sa/4.0/80x15.png" /></a>
+            </p>
+        </div>
+    </div>
+</body>
+</html>
