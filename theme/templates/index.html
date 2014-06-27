@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% from "post_or_summary_macro.html" import post_or_summary %}
+{% block content_title %}
+{% endblock %}
+{% block content %}
+	{% for article in articles_page.object_list %}
+        {{ post_or_summary(article, SITEURL, True) }}
+	{% endfor %}
+{% endblock content %}

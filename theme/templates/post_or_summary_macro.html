@@ -1,0 +1,34 @@
+{% macro post_or_summary(article, base_url, summary=False) %}
+    <div class="post">
+        <div class="entry-meta">
+            <div class="date">{{ article.locale_date }}</div>
+            <div class="author">By {{ article.author }}</div>
+            {% if article.tags %}
+                <div class="tag-list">
+                    {% for tag in article.tags|sort %}
+                        <a href="{{ base_url }}/{{ tag.url|clean_link }}" rel="tag">#{{ tag }}</a>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        </div>
+        <div class="entry-main">
+            <h1 class="entry-title">
+                <a href="{{ base_url }}/{{ article.url|clean_link }}" title="{{ article.title|striptags }}"
+                   rel="bookmark">{{ article.title }}</a>
+            </h1>
+            <div class="entry-content">
+                {% if summary %}
+                  {{ article.summary }}
+                {% else %}
+                  {{ article.content }}
+                {% endif %}
+            </div>
+            {% if summary %}
+                <div class="entry-read-more">
+                    <a href="{{ base_url }}/{{ article.url|clean_link }}" title="{{ article.title|striptags }}">Read
+                        more...</a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+{% endmacro %}

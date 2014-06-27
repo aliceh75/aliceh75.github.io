@@ -1,0 +1,166 @@
+@import url(http://fonts.googleapis.com/css?family=Open+Sans);
+@import url(http://fonts.googleapis.com/css?family=Montserrat);
+@import url("reset.css");
+@import url("pygment.css");
+
+/* Layout */
+#container {
+    width: 960px;
+    margin: 0 auto;
+}
+
+#header {
+	padding: 30px 0 20px 0;
+    width: 100%;
+    border-bottom: 1px solid #BBB;
+}
+
+#contents {
+	border-left: 1px solid #BBB;
+	margin-left: 199px;
+	padding-bottom: 10px;
+}
+
+div.entry-meta {
+	float: left;
+	margin-left: -199px;
+	text-align: right;
+	width: 190px;
+    padding-top: 30px;
+}
+
+div.entry-main {
+    padding-top: 30px;
+}
+
+/* General styling */
+body {
+    background-color: #FFF;
+}
+
+#container {
+    color: #000;
+    font-size: 18px;
+    font-family: 'Open Sans', sans-serif;
+}
+
+a, a:visited {
+  color: #000;
+  text-decoration: underline;
+}
+
+a:hover {
+    text-decoration: none;
+}
+
+em {
+    font-style: italic;
+}
+
+strong {
+    font-weight: bold;
+}
+
+/* Header styling */
+#site-title a {
+	color: #000;
+	font-size: 30px;
+    font-weight: normal;
+    font-family: "Montserrat", sans-serif;
+    text-decoration: none;
+}
+#site-title a:hover {
+    text-decoration: none;
+}
+
+/* Post styling */
+.entry-title a {
+	font-size: 24px;
+	text-transform: uppercase;
+    padding-bottom: 27px;
+    font-weight: normal;
+	text-decoration: none;
+}
+
+div.entry-main {
+    padding-right: 5px;
+    padding-bottom: 15px;
+    padding-left: 15px;
+}
+
+div.entry-content {
+    line-height: 30px;
+}
+
+div.entry-content h2{
+    font-size: 22px;
+    margin: 20px 0px;
+    font-family: "Montserrat", sans-serif;
+    font-weight: normal;
+}
+
+div.entry-content ul {
+    list-style: disc;
+    margin-left: 32px;
+}
+
+div.entry-content p {
+    margin: 16px 0;
+}
+
+div.entry-content div.highlight{
+    background: #F8F8F8;
+    border: 1px solid #DDD;
+    padding: 4px;
+    border-radius: 3px;
+    font-family: monospace;
+    font-size: 14px;
+    overflow-x: auto;
+    line-height: 150%;
+}
+
+div.entry-content code {
+    background: #F8F8F8;
+    border-radius: 3px;
+    border: 1px solid #DDD;
+    font-family: monospace;
+    font-size: 14px;
+}
+
+/* Post metadata styling */
+div.entry-meta {
+	text-align: right;
+}
+div.entry-meta .date {
+	color: #000;
+    font-size: 20px;
+	font-weight: bold;
+    margin-bottom: 8px;
+}
+div.entry-meta .author {
+    color: #BBB;
+    margin-bottom: 8px;
+}
+div.entry-meta .tag-list a {
+    text-decoration: none;
+}
+div.entry-meta .tag-list a:hover {
+    text-decoration: underline;
+}
+
+div.entry-read-more {
+    margin-top: 32px;
+}
+
+/* Footer */
+#footer {
+    color: #555;
+    font-size: 14px;
+    border-top: 1px solid #BBB;
+    padding-top: 30px;
+    text-align: right;
+}
+
+#footer p {
+    margin-bottom: 10px;
+}
