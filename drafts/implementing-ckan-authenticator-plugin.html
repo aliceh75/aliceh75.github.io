@@ -28,8 +28,12 @@
             </h1>
             <div class="entry-content">
                   <h2>Overview</h2>
-<p><a href="http://ckan.org">CKAN</a> allows plugin writters to provide their own authenticators, allowing people to log in to their CKAN instance using a variety of mechanism (OAuth, OpenID, etc.). CKAN actually offers two different methods for implementing authenticator methods - one based on the <a href="http://docs.repoze.org/who/2.0/">repoze.who WSGI authentication middleware</a>, and one based on their own <a href="http://docs.ckan.org/en/latest/extensions/plugin-interfaces.html#ckan.plugins.interfaces.IAuthenticator"><code>IAuthenticator</code></a> plugin interface.</p>
-<p>Here I describe how I implemented <a href="http://github.com/NaturalHistoryMuseum/ckanext-ldap">ckanext-ldap</a>, a plugin that provides an LDAP authentication method for CKAN using the <code>IAuthenticator</code> method.</p>
+<p><a href="http://ckan.org">CKAN</a> makes it possible for plugin authors to implement their own authentication mechanism - allowing users to log in to their CKAN instance using a variety of mechanism (OAuth, OpenID, etc.). Here I describe how I implemented <a href="http://github.com/NaturalHistoryMuseum/ckanext-ldap">ckanext-ldap</a>, a plugin that provides an LDAP authentication method for CKAN.</p>
+<h2>Repoze.who vs IAuthenticator</h2>
+<p>CKAN actually offers two different methods for implementing authenticators - one based on the <a href="http://docs.repoze.org/who/2.0/">repoze.who WSGI authentication middleware</a>, and one based on their own <a href="http://docs.ckan.org/en/latest/extensions/plugin-interfaces.html#ckan.plugins.interfaces.IAuthenticator"><code>IAuthenticator</code></a> plugin interface.</p>
+<p>The unofficial response I got about this is that the repoze.who method is the one that comes with <a href="http://www.pylonsproject.org/">Pylons</a>, on top of which CKAN was build, while the other method is the one CKAN developers have implemented themselves - and is the preferred approach. So this is the approach I have taken.</p>
+<h2>Matching users</h2>
+<p>using the <code>IAuthenticator</code> method.</p>
 <p>Note: This was implemented for CKAN 2.2. CKAN is a rapidly evolving project, so not all of this may apply to more recent versions.</p>
 <h2>Login form</h2>
 <p>For this plugin we want to allow users to use their LDAP account, but we also want to allow external users to create accounts and use those (this option can be switched off in the configuration). For ease of use we want a single form that can check both against the LDAP database and CKAN's database.</p>
