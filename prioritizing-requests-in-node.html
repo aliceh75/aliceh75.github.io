@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Alice/Development Notes &mdash; Prioritizing requests in node</title>
+    <meta charset="utf-8"/>
+    <link rel="stylesheet" type="text/css" href="http://aliceh75.github.io/theme/css/style.css"/>
+</head>
+
+<body>
+    <div id="container">
+        <div id="header">
+                <div id="site-title"><a href="http://aliceh75.github.io">Alice/Development Notes</a></div>
+        </div>
+
+        <div id="contents">
+    <div class="post">
+        <div class="entry-meta">
+            <div class="date">Wed 20 August 2014</div>
+            <div class="author">By Alice Heaton</div>
+                <div class="tag-list">
+                        <a href="http://aliceh75.github.io/tag/node" rel="tag">#node</a>
+                </div>
+        </div>
+        <div class="entry-main">
+            <h1 class="entry-title">
+                <a href="http://aliceh75.github.io/prioritizing-requests-in-node" title="Prioritizing requests in node"
+                   rel="bookmark">Prioritizing requests in node</a>
+            </h1>
+            <div class="entry-content">
+                  <h2>Overview</h2>
+<p>I was implementing a mapping server that served both map tiles and <a href="https://github.com/mapbox/utfgrid-spec">UTFGrids</a> (json data allowing us to create hovers for the points). While the clients would fire a number of requests for both tiles and grids, I wanted to ensure that the tiles were always given priority - to ensure they would get the visual part as fast as possible.</p>
+<p>Another thing I wanted to achieve was ensure that connections that were dropped by the client were not needlessly processed. This can happen a lot with slippy maps, when users just pan and zoom constantly.</p>
+<h2>Implementation</h2>
+<p>The idea was then to create a proxy that would only send as many requests as the map server could process at once. The remaining query would be kept in a queue where they could be prioritized. This approach also gave us the opportunity to drop requests from the queue when the client dropped the request - as this was much more complicated to do at the level of the map server itself.</p>
+<p>The implementation was simple: a <a href="http://nodejs.org/api/http.html">node http server</a> takes incoming requests, prioritizes them and puts them in a queue. We then use <a href="https://github.com/nodejitsu/node-http-proxy">node-http-proxy</a> to send them on. A bit of error handling (in particular to detect dropped connections), and user defined request types and priorities - and here we go.</p>
+<p>The class is used in this way:</p>
+<div class="highlight"><pre><span class="kd">var</span> <span class="nx">proxy</span> <span class="o">=</span> <span class="k">new</span> <span class="nx">QueueingProxy</span><span class="p">(</span>
+  <span class="mi">4000</span><span class="p">,</span>                      <span class="c1">// Incomming port</span>
+  <span class="s1">&#39;http://127.0.0.1:5000&#39;</span><span class="p">,</span>   <span class="c1">// Target server</span>
+  <span class="mi">4</span><span class="p">,</span>                         <span class="c1">// Number of requests that get set on at one time (per client)</span>
+  <span class="p">[</span><span class="s1">&#39;tile&#39;</span><span class="p">,</span> <span class="s1">&#39;grid&#39;</span><span class="p">,</span> <span class="s1">&#39;other&#39;</span><span class="p">],</span> <span class="c1">// The different types of requests, in priority order</span>
+  <span class="kd">function</span> <span class="p">(</span><span class="nx">req</span><span class="p">)</span> <span class="p">{</span>           <span class="c1">// A function to return the type of a given request</span>
+    <span class="k">if</span> <span class="p">(</span><span class="nx">req</span><span class="p">.</span><span class="nx">url</span><span class="p">.</span><span class="nx">match</span><span class="p">(</span><span class="sr">/\d+\/\d+\/\d+\.png/</span><span class="p">))</span> <span class="p">{</span>
+      <span class="k">return</span> <span class="s1">&#39;tile&#39;</span><span class="p">;</span>
+    <span class="p">}</span> <span class="k">else</span> <span class="k">if</span> <span class="p">(</span><span class="nx">req</span><span class="p">.</span><span class="nx">url</span><span class="p">.</span><span class="nx">match</span><span class="p">(</span><span class="sr">/\d+\/\d+\/\d+\.grid\.json/</span><span class="p">))</span> <span class="p">{</span>
+      <span class="k">return</span> <span class="s1">&#39;grid&#39;</span><span class="p">;</span>
+    <span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+      <span class="k">return</span> <span class="s1">&#39;other&#39;</span><span class="p">;</span>
+    <span class="p">}</span>
+  <span class="p">}</span>
+<span class="p">);</span>
+</pre></div>
+
+
+<h2>The code</h2>
+<p>The code is rather short (185 lines long), and it is not something I wanted to maintain beyond my immediate needs - so I am sharing it here. It may or may not work out of the box for your needs - this is shared for inspiration, not as a ready made tool!</p>
+<div class="highlight"><pre><span class="kd">var</span> <span class="nx">http</span> <span class="o">=</span> <span class="nx">require</span><span class="p">(</span><span class="s1">&#39;http&#39;</span><span class="p">);</span>
+<span class="kd">var</span> <span class="nx">httpProxy</span> <span class="o">=</span> <span class="nx">require</span><span class="p">(</span><span class="s1">&#39;http-proxy&#39;</span><span class="p">);</span>
+
+<span class="kd">var</span> <span class="nx">_queue_request_id_sec</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+
+<span class="cm">/**</span>
+<span class="cm"> * The QueueingProxy provides an HTTP proxy which can limit the number of requests sent to the proxy at one time,</span>
+<span class="cm"> * and prioritize incoming requests per type.</span>
+<span class="cm"> *</span>
+<span class="cm"> * @param port: Port to listen on;</span>
+<span class="cm"> * @param target: URL to proxy to;</span>
+<span class="cm"> * @param requests_per_client: Number of requests that can be pushed at one time for a single client;</span>
+<span class="cm"> * @param request_types: Array defining the request types, starting with the highest priority requests;</span>
+<span class="cm"> * @param get_request_type: Function that returns the request type of a request</span>
+<span class="cm"> * @constructor</span>
+<span class="cm"> */</span>
+<span class="kd">function</span> <span class="nx">QueueingProxy</span><span class="p">(</span><span class="nx">port</span><span class="p">,</span> <span class="nx">target</span><span class="p">,</span> <span class="nx">requests_per_client</span><span class="p">,</span> <span class="nx">request_types</span><span class="p">,</span> <span class="nx">get_request_type</span><span class="p">){</span>
+  <span class="kd">var</span> <span class="nx">self</span> <span class="o">=</span> <span class="k">this</span><span class="p">;</span>
+  <span class="c1">// General setup</span>
+  <span class="k">this</span><span class="p">.</span><span class="nx">_target</span> <span class="o">=</span> <span class="nx">target</span><span class="p">;</span>
+  <span class="k">this</span><span class="p">.</span><span class="nx">_requests_per_client</span> <span class="o">=</span> <span class="nx">requests_per_client</span><span class="p">;</span>
+  <span class="k">this</span><span class="p">.</span><span class="nx">_request_types</span> <span class="o">=</span> <span class="nx">request_types</span><span class="p">;</span>
+  <span class="k">this</span><span class="p">.</span><span class="nx">_get_request_type</span> <span class="o">=</span> <span class="nx">get_request_type</span><span class="p">;</span>
+  <span class="k">this</span><span class="p">.</span><span class="nx">_requests</span> <span class="o">=</span> <span class="p">{};</span>
+  <span class="k">this</span><span class="p">.</span><span class="nx">_processing</span> <span class="o">=</span> <span class="p">{};</span>
+  <span class="c1">// Start the proxy</span>
+  <span class="k">this</span><span class="p">.</span><span class="nx">_proxy</span> <span class="o">=</span> <span class="nx">httpProxy</span><span class="p">.</span><span class="nx">createProxyServer</span><span class="p">({});</span>
+  <span class="k">this</span><span class="p">.</span><span class="nx">_proxy</span><span class="p">.</span><span class="nx">on</span><span class="p">(</span><span class="s1">&#39;proxyRes&#39;</span><span class="p">,</span> <span class="kd">function</span><span class="p">(</span><span class="nx">res</span><span class="p">,</span> <span class="nx">req</span><span class="p">){</span>
+    <span class="nx">self</span><span class="p">.</span><span class="nx">_request_finished</span><span class="p">(</span><span class="nx">req</span><span class="p">);</span>
+  <span class="p">});</span>
+  <span class="k">this</span><span class="p">.</span><span class="nx">_proxy</span><span class="p">.</span><span class="nx">on</span><span class="p">(</span><span class="s1">&#39;error&#39;</span><span class="p">,</span> <span class="kd">function</span><span class="p">(</span><span class="nx">err</span><span class="p">,</span> <span class="nx">req</span><span class="p">,</span> <span class="nx">res</span><span class="p">){</span>
+    <span class="nx">self</span><span class="p">.</span><span class="nx">_deal_with_error</span><span class="p">(</span><span class="nx">req</span><span class="p">,</span> <span class="nx">err</span><span class="p">.</span><span class="nx">code</span><span class="p">.</span><span class="nx">toString</span><span class="p">()</span> <span class="o">+</span> <span class="s2">&quot;: &quot;</span><span class="p">);</span>
+  <span class="p">});</span>
+  <span class="c1">// And start listening</span>
+  <span class="k">this</span><span class="p">.</span><span class="nx">_http</span> <span class="o">=</span> <span class="nx">http</span><span class="p">.</span><span class="nx">createServer</span><span class="p">(</span><span class="kd">function</span><span class="p">(</span><span class="nx">req</span><span class="p">,</span> <span class="nx">res</span><span class="p">){</span>
+    <span class="nx">self</span><span class="p">.</span><span class="nx">_new_request</span><span class="p">(</span><span class="nx">req</span><span class="p">,</span> <span class="nx">res</span><span class="p">);</span>
+  <span class="p">}).</span><span class="nx">listen</span><span class="p">(</span><span class="nx">port</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="nx">QueueingProxy</span><span class="p">.</span><span class="nx">prototype</span><span class="p">.</span><span class="nx">_new_request</span> <span class="o">=</span> <span class="kd">function</span><span class="p">(</span><span class="nx">req</span><span class="p">,</span> <span class="nx">res</span><span class="p">){</span>
+  <span class="kd">var</span> <span class="nx">self</span> <span class="o">=</span> <span class="k">this</span><span class="p">;</span>
+  <span class="kd">var</span> <span class="nx">id</span> <span class="o">=</span> <span class="k">this</span><span class="p">.</span><span class="nx">_get_client_id</span><span class="p">(</span><span class="nx">req</span><span class="p">);</span>
+  <span class="kd">var</span> <span class="nx">request_id</span> <span class="o">=</span> <span class="k">this</span><span class="p">.</span><span class="nx">_get_request_id</span><span class="p">(</span><span class="nx">req</span><span class="p">);</span>
+  <span class="kd">var</span> <span class="nx">type</span> <span class="o">=</span> <span class="k">this</span><span class="p">.</span><span class="nx">_get_request_type</span><span class="p">(</span><span class="nx">req</span><span class="p">);</span>
+  <span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="s2">&quot;INCOMING: &quot;</span> <span class="o">+</span> <span class="nx">request_id</span><span class="p">);</span> <span class="c1">// + &quot; from &quot; + id);</span>
+  <span class="cm">/* Queue the request */</span>
+  <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="p">(</span><span class="nx">id</span> <span class="k">in</span> <span class="k">this</span><span class="p">.</span><span class="nx">_requests</span><span class="p">)){</span>
+    <span class="k">this</span><span class="p">.</span><span class="nx">_requests</span><span class="p">[</span><span class="nx">id</span><span class="p">]</span> <span class="o">=</span> <span class="p">{};</span>
+    <span class="k">for</span> <span class="p">(</span><span class="kd">var</span> <span class="nx">i</span> <span class="k">in</span> <span class="k">this</span><span class="p">.</span><span class="nx">_request_types</span><span class="p">){</span>
+      <span class="k">this</span><span class="p">.</span><span class="nx">_requests</span><span class="p">[</span><span class="nx">id</span><span class="p">][</span><span class="k">this</span><span class="p">.</span><span class="nx">_request_types</span><span class="p">[</span><span class="nx">i</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[];</span>
+    <span class="p">}</span>
+    <span class="k">this</span><span class="p">.</span><span class="nx">_processing</span><span class="p">[</span><span class="nx">id</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+  <span class="p">}</span>
+
+  <span class="k">this</span><span class="p">.</span><span class="nx">_requests</span><span class="p">[</span><span class="nx">id</span><span class="p">][</span><span class="nx">type</span><span class="p">].</span><span class="nx">push</span><span class="p">({</span>
+    <span class="s1">&#39;req&#39;</span><span class="o">:</span> <span class="nx">req</span><span class="p">,</span>
+    <span class="s1">&#39;res&#39;</span><span class="o">:</span> <span class="nx">res</span>
+  <span class="p">});</span>
+  <span class="cm">/* Ensure request is removed from list on premature termination */</span>
+  <span class="nx">req</span><span class="p">.</span><span class="nx">on</span><span class="p">(</span><span class="s1">&#39;close&#39;</span><span class="p">,</span> <span class="kd">function</span><span class="p">(){</span>
+    <span class="nx">self</span><span class="p">.</span><span class="nx">_deal_with_error</span><span class="p">(</span><span class="nx">req</span><span class="p">,</span> <span class="s1">&#39;DROPPED: &#39;</span><span class="p">);</span>
+  <span class="p">});</span>
+  <span class="cm">/* Kickstart the consumer */</span>
+  <span class="k">this</span><span class="p">.</span><span class="nx">_process_next_requests</span><span class="p">(</span><span class="nx">id</span><span class="p">);</span>
+<span class="p">};</span>
+
+<span class="cm">/**</span>
+<span class="cm"> * For a given http request return a string identifying the client.</span>
+<span class="cm"> *</span>
+<span class="cm"> * This will cache the client id on the request object.</span>
+<span class="cm"> *</span>
+<span class="cm"> * @param req: HTTP request object</span>
+<span class="cm"> * @return: String - The client id</span>
+<span class="cm"> */</span>
+<span class="nx">QueueingProxy</span><span class="p">.</span><span class="nx">prototype</span><span class="p">.</span><span class="nx">_get_client_id</span> <span class="o">=</span> <span class="kd">function</span><span class="p">(</span><span class="nx">req</span><span class="p">){</span>
+  <span class="k">if</span> <span class="p">(</span><span class="k">typeof</span> <span class="nx">req</span><span class="p">.</span><span class="nx">_queue_client_id</span> <span class="o">!==</span> <span class="s1">&#39;undefined&#39;</span><span class="p">){</span>
+    <span class="k">return</span> <span class="nx">req</span><span class="p">.</span><span class="nx">_queue_client_id</span><span class="p">;</span>
+  <span class="p">}</span>
+  <span class="kd">var</span> <span class="nx">ip</span> <span class="o">=</span> <span class="nx">req</span><span class="p">.</span><span class="nx">headers</span><span class="p">[</span><span class="s1">&#39;x-forwarded-for&#39;</span><span class="p">]</span> <span class="o">||</span> <span class="nx">req</span><span class="p">.</span><span class="nx">connection</span><span class="p">.</span><span class="nx">remoteAddress</span><span class="p">;</span>
+  <span class="kd">var</span> <span class="nx">id</span> <span class="o">=</span> <span class="nx">ip</span> <span class="o">+</span> <span class="s2">&quot;-&quot;</span> <span class="o">+</span> <span class="nx">req</span><span class="p">[</span><span class="s1">&#39;headers&#39;</span><span class="p">][</span><span class="s1">&#39;user-agent&#39;</span><span class="p">]</span> <span class="o">+</span> <span class="s2">&quot;-&quot;</span> <span class="o">+</span> <span class="nx">req</span><span class="p">[</span><span class="s1">&#39;headers&#39;</span><span class="p">][</span><span class="s1">&#39;cookie&#39;</span><span class="p">];</span>
+  <span class="nx">req</span><span class="p">.</span><span class="nx">_queue_client_id</span> <span class="o">=</span> <span class="nx">id</span><span class="p">;</span>
+  <span class="k">return</span> <span class="nx">id</span><span class="p">;</span>
+<span class="p">};</span>
+
+<span class="cm">/**</span>
+<span class="cm"> * Return the request id for the given request.</span>
+<span class="cm"> *</span>
+<span class="cm"> * The request id is cached on the object, and generated sequentially</span>
+<span class="cm"> *</span>
+<span class="cm"> * @param req: HTTP request object</span>
+<span class="cm"> * @return: String - the request id</span>
+<span class="cm"> */</span>
+<span class="nx">QueueingProxy</span><span class="p">.</span><span class="nx">prototype</span><span class="p">.</span><span class="nx">_get_request_id</span> <span class="o">=</span> <span class="kd">function</span><span class="p">(</span><span class="nx">req</span><span class="p">){</span>
+  <span class="k">if</span> <span class="p">(</span><span class="k">typeof</span> <span class="nx">req</span><span class="p">.</span><span class="nx">_queue_request_id</span> <span class="o">!==</span> <span class="s1">&#39;undefined&#39;</span><span class="p">){</span>
+    <span class="k">return</span> <span class="nx">req</span><span class="p">.</span><span class="nx">_queue_request_id</span><span class="p">;</span>
+  <span class="p">}</span>
+
+  <span class="nx">req</span><span class="p">.</span><span class="nx">_queue_request_id</span> <span class="o">=</span> <span class="s2">&quot;r&quot;</span> <span class="o">+</span> <span class="nx">_queue_request_id_sec</span><span class="p">.</span><span class="nx">toString</span><span class="p">();</span>
+  <span class="nx">_queue_request_id_sec</span> <span class="o">+=</span> <span class="mi">1</span><span class="p">;</span>
+  <span class="k">return</span> <span class="nx">req</span><span class="p">.</span><span class="nx">_queue_request_id</span><span class="p">;</span>
+<span class="p">};</span>
+
+<span class="cm">/**</span>
+<span class="cm"> * Process next requests for the given client id</span>
+<span class="cm"> *</span>
+<span class="cm"> * @param id: Client id</span>
+<span class="cm"> * @param type: If defined, the type of request to process. If not defined, process the first available request</span>
+<span class="cm"> *              with the highest priority type</span>
+<span class="cm"> */</span>
+<span class="nx">QueueingProxy</span><span class="p">.</span><span class="nx">prototype</span><span class="p">.</span><span class="nx">_process_next_requests</span> <span class="o">=</span> <span class="kd">function</span><span class="p">(</span><span class="nx">id</span><span class="p">,</span> <span class="nx">type</span><span class="p">){</span>
+  <span class="k">if</span> <span class="p">(</span><span class="k">this</span><span class="p">.</span><span class="nx">_processing</span><span class="p">[</span><span class="nx">id</span><span class="p">]</span> <span class="o">&gt;=</span> <span class="k">this</span><span class="p">.</span><span class="nx">_requests_per_client</span><span class="p">){</span>
+    <span class="k">return</span><span class="p">;</span>
+  <span class="p">}</span>
+  <span class="k">if</span> <span class="p">(</span><span class="k">typeof</span> <span class="nx">type</span> <span class="o">==</span> <span class="s1">&#39;undefined&#39;</span><span class="p">){</span>
+    <span class="k">for</span> <span class="p">(</span><span class="kd">var</span> <span class="nx">i</span> <span class="k">in</span> <span class="k">this</span><span class="p">.</span><span class="nx">_request_types</span><span class="p">){</span>
+      <span class="kd">var</span> <span class="nx">r_type</span> <span class="o">=</span> <span class="k">this</span><span class="p">.</span><span class="nx">_request_types</span><span class="p">[</span><span class="nx">i</span><span class="p">];</span>
+      <span class="k">if</span> <span class="p">(</span><span class="k">this</span><span class="p">.</span><span class="nx">_requests</span><span class="p">[</span><span class="nx">id</span><span class="p">][</span><span class="nx">r_type</span><span class="p">].</span><span class="nx">length</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">){</span>
+        <span class="k">return</span> <span class="k">this</span><span class="p">.</span><span class="nx">_process_next_requests</span><span class="p">(</span><span class="nx">id</span><span class="p">,</span> <span class="nx">r_type</span><span class="p">);</span>
+      <span class="p">}</span>
+    <span class="p">}</span>
+    <span class="k">return</span><span class="p">;</span>
+  <span class="p">}</span>
+  <span class="kd">var</span> <span class="nx">request</span> <span class="o">=</span> <span class="k">this</span><span class="p">.</span><span class="nx">_requests</span><span class="p">[</span><span class="nx">id</span><span class="p">][</span><span class="nx">type</span><span class="p">].</span><span class="nx">pop</span><span class="p">();</span>
+  <span class="k">this</span><span class="p">.</span><span class="nx">_processing</span><span class="p">[</span><span class="nx">id</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span><span class="p">;</span>
+  <span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="s2">&quot;FORWARDING &quot;</span> <span class="o">+</span> <span class="nx">request</span><span class="p">[</span><span class="s1">&#39;req&#39;</span><span class="p">].</span><span class="nx">_queue_request_id</span> <span class="o">+</span> <span class="s2">&quot; (&quot;</span> <span class="o">+</span> <span class="nx">type</span> <span class="o">+</span> <span class="s2">&quot;)&quot;</span><span class="p">);</span> <span class="c1">// + &quot; from &quot; + id + &quot; sent to target server.&quot;);</span>
+  <span class="k">this</span><span class="p">.</span><span class="nx">_proxy</span><span class="p">.</span><span class="nx">web</span><span class="p">(</span><span class="nx">request</span><span class="p">[</span><span class="s1">&#39;req&#39;</span><span class="p">],</span> <span class="nx">request</span><span class="p">[</span><span class="s1">&#39;res&#39;</span><span class="p">],</span> <span class="p">{</span><span class="nx">target</span><span class="o">:</span> <span class="k">this</span><span class="p">.</span><span class="nx">_target</span><span class="p">});</span>
+  <span class="k">this</span><span class="p">.</span><span class="nx">_process_next_requests</span><span class="p">(</span><span class="nx">id</span><span class="p">);</span>
+<span class="p">};</span>
+
+<span class="cm">/**</span>
+<span class="cm"> * Handle finished requests</span>
+<span class="cm"> * @param req: HTTP request object</span>
+<span class="cm"> */</span>
+<span class="nx">QueueingProxy</span><span class="p">.</span><span class="nx">prototype</span><span class="p">.</span><span class="nx">_request_finished</span> <span class="o">=</span> <span class="kd">function</span><span class="p">(</span><span class="nx">req</span><span class="p">){</span>
+  <span class="kd">var</span> <span class="nx">id</span> <span class="o">=</span> <span class="k">this</span><span class="p">.</span><span class="nx">_get_client_id</span><span class="p">(</span><span class="nx">req</span><span class="p">);</span>
+  <span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="s2">&quot;FINISHED: &quot;</span> <span class="o">+</span> <span class="nx">req</span><span class="p">.</span><span class="nx">_queue_request_id</span><span class="p">);</span> <span class="c1">// + &quot; from &quot; + id);</span>
+  <span class="k">if</span> <span class="p">(</span><span class="k">this</span><span class="p">.</span><span class="nx">_request_continuation</span><span class="p">(</span><span class="nx">req</span><span class="p">))</span> <span class="p">{</span>
+    <span class="k">this</span><span class="p">.</span><span class="nx">_processing</span><span class="p">[</span><span class="nx">id</span><span class="p">]</span> <span class="o">-=</span> <span class="mi">1</span><span class="p">;</span>
+    <span class="k">this</span><span class="p">.</span><span class="nx">_process_next_requests</span><span class="p">(</span><span class="nx">id</span><span class="p">);</span>
+  <span class="p">}</span>
+<span class="p">};</span>
+
+<span class="cm">/**</span>
+<span class="cm"> * Handle error for the given request</span>
+<span class="cm"> */</span>
+<span class="nx">QueueingProxy</span><span class="p">.</span><span class="nx">prototype</span><span class="p">.</span><span class="nx">_deal_with_error</span> <span class="o">=</span> <span class="kd">function</span><span class="p">(</span><span class="nx">req</span><span class="p">,</span> <span class="nx">msg_prefix</span><span class="p">){</span>
+  <span class="kd">var</span> <span class="nx">id</span> <span class="o">=</span> <span class="k">this</span><span class="p">.</span><span class="nx">_get_client_id</span><span class="p">(</span><span class="nx">req</span><span class="p">);</span>
+  <span class="kd">var</span> <span class="nx">request_id</span> <span class="o">=</span> <span class="k">this</span><span class="p">.</span><span class="nx">_get_request_id</span><span class="p">(</span><span class="nx">req</span><span class="p">);</span>
+  <span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="nx">msg_prefix</span> <span class="o">+</span> <span class="nx">request_id</span><span class="p">);</span> <span class="c1">// + &quot; for client &quot; + id);</span>
+  <span class="kd">var</span> <span class="nx">pos</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span><span class="p">;</span>
+  <span class="kd">var</span> <span class="nx">type</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span><span class="p">;</span>
+  <span class="k">for</span> <span class="p">(</span><span class="kd">var</span> <span class="nx">t</span> <span class="k">in</span> <span class="k">this</span><span class="p">.</span><span class="nx">_requests</span><span class="p">[</span><span class="nx">id</span><span class="p">]){</span>
+    <span class="k">for</span> <span class="p">(</span><span class="kd">var</span> <span class="nx">i</span> <span class="k">in</span> <span class="k">this</span><span class="p">.</span><span class="nx">_requests</span><span class="p">[</span><span class="nx">id</span><span class="p">][</span><span class="nx">t</span><span class="p">]){</span>
+      <span class="k">if</span> <span class="p">(</span><span class="k">this</span><span class="p">.</span><span class="nx">_get_request_id</span><span class="p">(</span><span class="k">this</span><span class="p">.</span><span class="nx">_requests</span><span class="p">[</span><span class="nx">id</span><span class="p">][</span><span class="nx">t</span><span class="p">][</span><span class="nx">i</span><span class="p">].</span><span class="nx">req</span><span class="p">)</span> <span class="o">==</span> <span class="nx">request_id</span><span class="p">){</span>
+        <span class="nx">type</span> <span class="o">=</span> <span class="nx">t</span><span class="p">;</span>
+        <span class="nx">pos</span> <span class="o">=</span> <span class="nx">i</span><span class="p">;</span>
+        <span class="k">break</span><span class="p">;</span>
+      <span class="p">}</span>
+    <span class="p">}</span>
+    <span class="k">if</span> <span class="p">(</span><span class="nx">pos</span> <span class="o">&gt;=</span> <span class="mi">0</span><span class="p">){</span>
+      <span class="k">break</span><span class="p">;</span>
+    <span class="p">}</span>
+  <span class="p">}</span>
+  <span class="k">if</span> <span class="p">(</span><span class="nx">pos</span> <span class="o">&gt;=</span> <span class="mi">0</span><span class="p">){</span>
+    <span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="nx">request_id</span> <span class="o">+</span> <span class="s1">&#39; still in the queue - removing.&#39;</span><span class="p">);</span>
+    <span class="k">this</span><span class="p">.</span><span class="nx">_requests</span><span class="p">[</span><span class="nx">id</span><span class="p">][</span><span class="nx">type</span><span class="p">].</span><span class="nx">splice</span><span class="p">(</span><span class="nx">pos</span><span class="p">,</span> <span class="mi">1</span><span class="p">);</span>
+  <span class="p">}</span>
+  <span class="k">if</span> <span class="p">(</span><span class="k">this</span><span class="p">.</span><span class="nx">_request_continuation</span><span class="p">(</span><span class="nx">req</span><span class="p">))</span> <span class="p">{</span>
+    <span class="k">this</span><span class="p">.</span><span class="nx">_processing</span><span class="p">[</span><span class="nx">id</span><span class="p">]</span> <span class="o">-=</span> <span class="mi">1</span><span class="p">;</span>
+    <span class="k">this</span><span class="p">.</span><span class="nx">_process_next_requests</span><span class="p">(</span><span class="nx">id</span><span class="p">);</span>
+  <span class="p">}</span>
+<span class="p">};</span>
+
+<span class="cm">/**</span>
+<span class="cm"> * Retruns true if this request&#39;s continuation has not yet been processed. Calling this marks the requests continuation</span>
+<span class="cm"> * has having been processed.</span>
+<span class="cm"> */</span>
+<span class="nx">QueueingProxy</span><span class="p">.</span><span class="nx">prototype</span><span class="p">.</span><span class="nx">_request_continuation</span> <span class="o">=</span> <span class="kd">function</span><span class="p">(</span><span class="nx">req</span><span class="p">){</span>
+  <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="nx">req</span><span class="p">.</span><span class="nx">_queue_request_continuation</span><span class="p">)</span> <span class="p">{</span>
+    <span class="nx">req</span><span class="p">.</span><span class="nx">_queue_request_continuation</span> <span class="o">=</span> <span class="kc">true</span><span class="p">;</span>
+    <span class="k">return</span> <span class="kc">true</span><span class="p">;</span>
+  <span class="p">}</span>
+  <span class="k">return</span> <span class="kc">false</span><span class="p">;</span>
+<span class="p">};</span>
+
+<span class="nx">module</span><span class="p">.</span><span class="nx">exports</span> <span class="o">=</span> <span class="nx">QueueingProxy</span><span class="p">;</span>
+</pre></div>
+            </div>
+        </div>
+    </div>
+        </div>
+
+        <div id="footer">
+            <p>Alice online: <a href="http://github.com/aliceh75">GitHub</a> <a href="https://twitter.com/aliceheaton75">Twitter</a></p>
+            <p>Site generated by <a href="http://pelican.readthedocs.org">Pelican</a>, theme loosely based on <a href="https://github.com/tbunnyman/pelican-chunk">Chunk</a></p>
+            <p>All content by Alice Heaton, licensed under a <a rel="license" href="http://creativecommons.org/licenses/by-sa/4.0/">Creative Commons Attribution-ShareAlike 4.0 International License</a>
+               <a rel="license" href="http://creativecommons.org/licenses/by-sa/4.0/"><img alt="Creative Commons Licence" style="border-width:0" src="http://i.creativecommons.org/l/by-sa/4.0/80x15.png" /></a>
+            </p>
+        </div>
+    </div>
+</body>
+</html>
