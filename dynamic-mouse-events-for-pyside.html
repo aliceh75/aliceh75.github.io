@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Alice/Development Notes &mdash; Dynamic mouse events for PySide</title>
+    <meta charset="utf-8"/>
+    <link rel="stylesheet" type="text/css" href="http://aliceh75.github.io/theme/css/style.css"/>
+</head>
+
+<body>
+    <div id="container">
+        <div id="header">
+                <div id="site-title"><a href="http://aliceh75.github.io">Alice/Development Notes</a></div>
+        </div>
+
+        <div id="contents">
+    <div class="post">
+        <div class="entry-meta">
+            <div class="date">Mon 29 September 2014</div>
+            <div class="author">By Alice Heaton</div>
+                <div class="tag-list">
+                        <a href="http://aliceh75.github.io/tag/pyside" rel="tag">#pyside</a>
+                        <a href="http://aliceh75.github.io/tag/python" rel="tag">#python</a>
+                </div>
+        </div>
+        <div class="entry-main">
+            <h1 class="entry-title">
+                <a href="http://aliceh75.github.io/dynamic-mouse-events-for-pyside" title="Dynamic mouse events for PySide"
+                   rel="bookmark">Dynamic mouse events for PySide</a>
+            </h1>
+            <div class="entry-content">
+                  <h2>A static event model</h2>
+<p><a href="http://qt-project.org/wiki/PySide">PySide</a>, one of the Python bindings for <a href="http://qt-project.org/">Qt</a>, uses the same event model as the C++ version of Qt - one that is designed for static languages. The problem with this event model is that the semantic of your code is defined by the event. For example if you want to pan a view when the middle button is clicked, you would have to implement <code>mousePressEvent</code>, <code>mouseReleaveEvent</code> and <code>mouseMoveEvent</code> in this way:</p>
+<div class="highlight"><pre><span class="k">class</span> <span class="nc">MyView</span><span class="p">(</span><span class="n">QtGui</span><span class="o">.</span><span class="n">QGraphicsView</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parent</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="n">QtGui</span><span class="o">.</span><span class="n">QGraphicsView</span><span class="o">.</span><span class="n">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parent</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_mouse_press</span> <span class="o">=</span> <span class="bp">None</span>
+
+    <span class="k">def</span> <span class="nf">mousePressEvent</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">event</span><span class="o">.</span><span class="n">button</span><span class="p">()</span> <span class="o">==</span> <span class="n">QtCore</span><span class="o">.</span><span class="n">Qt</span><span class="o">.</span><span class="n">MidButton</span><span class="p">:</span>
+          <span class="bp">self</span><span class="o">.</span><span class="n">_middle_press</span> <span class="o">=</span> <span class="p">(</span><span class="n">event</span><span class="o">.</span><span class="n">pos</span><span class="p">()</span><span class="o">.</span><span class="n">x</span><span class="p">(),</span> <span class="n">event</span><span class="o">.</span><span class="n">pos</span><span class="p">()</span><span class="o">.</span><span class="n">y</span><span class="p">())</span>
+
+    <span class="k">def</span> <span class="nf">mouseReleaseEvent</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_middle_press</span> <span class="o">=</span> <span class="bp">None</span>
+
+    <span class="k">def</span> <span class="nf">mouseMoveEvent</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_middle_press</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="n">pos</span> <span class="o">=</span> <span class="p">(</span><span class="n">event</span><span class="o">.</span><span class="n">pos</span><span class="p">()</span><span class="o">.</span><span class="n">x</span><span class="p">(),</span> <span class="n">event</span><span class="o">.</span><span class="n">pos</span><span class="p">()</span><span class="o">.</span><span class="n">y</span><span class="p">())</span>
+            <span class="n">delta_x</span> <span class="o">=</span> <span class="n">pos</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">_middle_press</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">delta_y</span> <span class="o">=</span> <span class="n">pos</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">_middle_press</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+            <span class="n">h</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">horizontalScrollBar</span><span class="p">()</span>
+            <span class="n">v</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">verticalScrollBar</span><span class="p">()</span>
+            <span class="n">h</span><span class="o">.</span><span class="n">setValue</span><span class="p">(</span><span class="n">h</span><span class="o">.</span><span class="n">value</span><span class="p">()</span> <span class="o">+</span> <span class="n">delta_x</span><span class="p">)</span>
+            <span class="n">v</span><span class="o">.</span><span class="n">setValue</span><span class="p">(</span><span class="n">v</span><span class="o">.</span><span class="n">value</span><span class="p">()</span> <span class="o">+</span> <span class="n">delta_y</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_middle_press</span> <span class="o">=</span> <span class="n">pos</span>
+</pre></div>
+
+
+<p>This could be implemented in various different ways, but the one thing that remains is that we must spread the logic between three calls, <code>mousePressEvent</code>, <code>mouseReleaseEvent</code> and <code>mouseMoveEvent</code>, which are named after the event being triggered, not after what the functionality actually does. This means that there is no way to tell what happens without reading the whole code line by line.</p>
+<h2>Implementing a more dynamic model</h2>
+<p>What we want, instead of implementing something called <code>mouseMoveEvent</code> is to implement something called <code>scroll_view</code> - after what it does, not the way it was invoked - and get that called, with the position delta, when the mouse is moved with the middle button down. Something like this:</p>
+<div class="highlight"><pre><span class="n">add_mouse_handler</span><span class="p">(</span>
+    <span class="n">event</span><span class="o">=</span><span class="p">{</span>
+        <span class="s">&#39;event&#39;</span><span class="p">:</span> <span class="s">&#39;move&#39;</span><span class="p">,</span>
+        <span class="s">&#39;button&#39;</span><span class="p">:</span> <span class="s">&#39;middle&#39;</span>
+    <span class="p">},</span>
+    <span class="n">callback</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">scroll_view</span><span class="p">,</span>
+    <span class="n">args</span><span class="o">=</span><span class="p">[</span><span class="n">MouseState</span><span class="p">(</span><span class="s">&#39;delta_x&#39;</span><span class="p">),</span> <span class="n">MouseState</span><span class="p">(</span><span class="s">&#39;delta_y&#39;</span><span class="p">)]</span>
+<span class="p">)</span>
+</pre></div>
+
+
+<p>What this does is self-explanatory: when the mouse is moved with the middle button pressed, invoke <code>self.scroll_view</code> with the mouse position delta. Now our class only needs to implement one method, <code>scroll_view</code>, named after what it actually does, and is invoked with meaninful parameters.</p>
+<p>The full class so implemented would look like:</p>
+<div class="highlight"><pre><span class="k">class</span> <span class="nc">MyView</span><span class="p">(</span><span class="n">MouseHandler</span><span class="p">,</span> <span class="n">QtGui</span><span class="o">.</span><span class="n">QGraphicsView</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parent</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="n">QtGui</span><span class="o">.</span><span class="n">QGraphicsView</span><span class="o">.</span><span class="n">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parent</span><span class="p">)</span>
+        <span class="n">MouseHandler</span><span class="o">.</span><span class="n">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parent_class</span><span class="o">=</span><span class="n">QtGui</span><span class="o">.</span><span class="n">QGraphicsView</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">add_mouse_handler</span><span class="p">(</span>
+            <span class="n">event</span><span class="o">=</span><span class="p">{</span>
+                <span class="s">&#39;event&#39;</span><span class="p">:</span> <span class="s">&#39;move&#39;</span><span class="p">,</span>
+                <span class="s">&#39;button&#39;</span><span class="p">:</span> <span class="s">&#39;middle&#39;</span>
+            <span class="p">},</span>
+            <span class="n">callback</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">scroll_view</span><span class="p">,</span>
+            <span class="n">args</span><span class="o">=</span><span class="p">[</span><span class="n">MouseState</span><span class="p">(</span><span class="s">&#39;delta_x&#39;</span><span class="p">),</span> <span class="n">MouseState</span><span class="p">(</span><span class="s">&#39;delta_y&#39;</span><span class="p">)]</span>
+        <span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">scroll_view</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">delta_x</span><span class="p">,</span> <span class="n">delta_y</span><span class="p">):</span>
+        <span class="n">h</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">horizontalScrollBar</span><span class="p">()</span>
+        <span class="n">v</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">verticalScrollBar</span><span class="p">()</span>
+        <span class="n">h</span><span class="o">.</span><span class="n">setValue</span><span class="p">(</span><span class="n">h</span><span class="o">.</span><span class="n">value</span><span class="p">()</span> <span class="o">+</span> <span class="n">delta_x</span><span class="p">)</span>
+        <span class="n">v</span><span class="o">.</span><span class="n">setValue</span><span class="p">(</span><span class="n">v</span><span class="o">.</span><span class="n">value</span><span class="p">()</span> <span class="o">+</span> <span class="n">delta_y</span><span class="p">)</span>
+</pre></div>
+
+
+<p>It's not just much shorter - it's also much clearer. None of the actual business logic was moved out, <code>scroll_view</code> is generic and re-usable, and the <code>add_mouse_handler</code> call can be understood without knowing the underlying library.</p>
+<h2>The mouse state</h2>
+<p>The <code>MouseHandler</code> mixin works by keeping a comprehensive state of the mouse, which includes:</p>
+<ul>
+<li>The event name ('press', 'release', 'double-click', 'wheel', 'move', 'enter' or 'leave');</li>
+<li>The current position of the mouse;</li>
+<li>The delta of the mouse movement;</li>
+<li>The currently pressed button;</li>
+<li>The mouse position at which the button was pressed;</li>
+<li>The delta value of the wheel move;</li>
+<li>Whether the mouse is over the current element (for 'hover' events);</li>
+<li>Which keyboard modfiers are currently pressed.</li>
+</ul>
+<p>The <code>MouseHandler</code> makes it possible to react to any combination of values in the mouse state - for example when the mouse is being moved with the middle button down and the control key pressed. And the handler being called can be passed a list of arguments, any of which may come from the mouse state - so we can pass the mouse co-ordinates, the mouse delta, etc. This can be combined with static arguments - so if our <code>scroll_view</code> method had a last argument called <code>relative</code> and defaulting to False, we could have set the argument list to
+<code>[MouseState('delta_x'), MouseState('delta_y'), True]</code></p>
+<p>To increase the expressiveness of the code, classes can event add their own custom mouse states - for instance you could add <code>pressed_corner</code> to define which corner of a box was pressed. You can then fire different move events depending on this.</p>
+<h2>The code!</h2>
+<p>At this stage I'm not sure whether I'll support this in the long term - that depends on whether I get involved in more PySide projects. For now, I will share the code here - I might create a repo at some point (check my GitHub page). Note that the code is shared as-is for inspiration, rather than something you can just pull and re-use. Here goes:</p>
+<div class="highlight"><pre><span class="kn">from</span> <span class="nn">PySide</span> <span class="kn">import</span> <span class="n">QtCore</span>
+
+
+<span class="k">class</span> <span class="nc">MouseState</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Class used to represent a property of a mouse state.</span>
+
+<span class="sd">    This is used to represent callback arguments that must be defined when the event is fired - eg. MouseState(&#39;x&#39;)</span>
+<span class="sd">    will represent the &#39;x&#39; property of the mouse state when the event is fired</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    state : str</span>
+<span class="sd">        The mouse state to represent</span>
+
+<span class="sd">    Attributes</span>
+<span class="sd">    ----------</span>
+<span class="sd">    state : str</span>
+<span class="sd">        The mouse state to represent</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">state</span> <span class="o">=</span> <span class="n">state</span>
+
+
+<span class="k">class</span> <span class="nc">MouseHandler</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Mixin used to map mouse events to methods.</span>
+
+<span class="sd">    This mixin uses the following event names: &#39;press&#39;, &#39;release&#39;, &#39;double-click&#39;, &#39;wheel&#39;, &#39;move&#39;, &#39;enter&#39;, &#39;leave&#39;.</span>
+<span class="sd">    The mouse state contains the following properties:</span>
+<span class="sd">        event : str</span>
+<span class="sd">            The event name</span>
+<span class="sd">        x : int</span>
+<span class="sd">            Current X mouse position</span>
+<span class="sd">        y : int</span>
+<span class="sd">            Current Y mouse position</span>
+<span class="sd">        button : str, None</span>
+<span class="sd">            The current button state. One of &#39;left&#39;, &#39;right&#39;, &#39;middle&#39;, None</span>
+<span class="sd">        pressed_x : int, None</span>
+<span class="sd">            The X coordinate where the mouse was pressed (if applicable) or None</span>
+<span class="sd">        pressed_y : int, None</span>
+<span class="sd">            The Y coordinate where the mouse was pressed (if applicable) or None</span>
+<span class="sd">        delta_x : int</span>
+<span class="sd">            The X delta of the mouse movement</span>
+<span class="sd">        delta_y : int</span>
+<span class="sd">            The Y delta of the mouse movement</span>
+<span class="sd">        wheel_delta : int</span>
+<span class="sd">            The delta sent by the mouse wheel on wheel events or None</span>
+<span class="sd">        over : bool</span>
+<span class="sd">            True if the mouse is over the current item, false if not</span>
+<span class="sd">        modifier : int</span>
+<span class="sd">            A Qt key modifier constant</span>
+
+<span class="sd">    Example</span>
+<span class="sd">    -------</span>
+<span class="sd">    To use MouseEvents, you need to inherit from it and call it&#39;s initializer specifying the class which holds</span>
+<span class="sd">    the default Mouse events implementation:</span>
+
+<span class="sd">        class GraphicsView(MouseEvents, QtGui.QGraphicsView):</span>
+<span class="sd">        def __init__(self, parent=None):</span>
+<span class="sd">            QtGui.QGraphicsView.__init__(self, parent)</span>
+<span class="sd">            MouseEvents.__init__(self, parent_class=QtGui.QGraphicsView)</span>
+
+<span class="sd">    You can then add handlers for any combination of events and mouse state:</span>
+
+<span class="sd">            self.add_mouse_handler({</span>
+<span class="sd">                &#39;event&#39;: &#39;move&#39;,</span>
+<span class="sd">                &#39;button&#39;: &#39;middle&#39;</span>
+<span class="sd">            }), self.scroll_view, args=[MouseState(&#39;x&#39;), MouseState(&#39;y&#39;), True])</span>
+<span class="sd">            self.add_mouse_handler({</span>
+<span class="sd">                &#39;event&#39;: &#39;wheel&#39;,</span>
+<span class="sd">                &#39;button&#39;: None,</span>
+<span class="sd">                &#39;modifier&#39;: QtCore.Qt.ControlModifier</span>
+<span class="sd">            }, self.zoom)</span>
+
+
+<span class="sd">    The functions will be called with event-specific arguments:</span>
+<span class="sd">        def scroll_view(self, x, y, refresh=False):</span>
+<span class="sd">            h = self.horizontalScrollBar()</span>
+<span class="sd">            v = self.verticalScrollBar()</span>
+<span class="sd">            delta = self.get_mouse_state(&#39;delta&#39;)</span>
+<span class="sd">            h.setValue(h.value() + delta[0])</span>
+<span class="sd">            v.setValue(v.value() + delta[1])</span>
+
+<span class="sd">    Notes</span>
+<span class="sd">    -----</span>
+<span class="sd">    - The mixin implements Qt mouse events methods, so classes should not implement their own.</span>
+<span class="sd">    - Some elements, such as elements derived from QtGraphicsItem, will not trigger mouse move</span>
+<span class="sd">      events unless a button is pressed. To change that behaviour, you need to call</span>
+<span class="sd">      `setAcceptHoverEvents` to True. Qt will then fire different events whether a button is</span>
+<span class="sd">      pressed or not. The MouseEvents abstracts this behaviour - so you can rely on the event</span>
+<span class="sd">      {&#39;event&#39;: &#39;move&#39;, &#39;over&#39;: True} to work in both instances.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parent_class</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parent_class</span> <span class="o">=</span> <span class="n">parent_class</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_last_position</span> <span class="o">=</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_mouse_state</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s">&#39;event&#39;</span><span class="p">:</span> <span class="bp">None</span><span class="p">,</span>
+            <span class="s">&#39;button&#39;</span><span class="p">:</span> <span class="bp">None</span><span class="p">,</span>
+            <span class="s">&#39;x&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+            <span class="s">&#39;y&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+            <span class="s">&#39;pressed_x&#39;</span><span class="p">:</span> <span class="bp">None</span><span class="p">,</span>
+            <span class="s">&#39;pressed_y&#39;</span><span class="p">:</span> <span class="bp">None</span><span class="p">,</span>
+            <span class="s">&#39;delta_x&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+            <span class="s">&#39;delta_y&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+            <span class="s">&#39;over&#39;</span><span class="p">:</span> <span class="bp">False</span><span class="p">,</span>
+            <span class="s">&#39;modifier&#39;</span><span class="p">:</span> <span class="n">QtCore</span><span class="o">.</span><span class="n">Qt</span><span class="o">.</span><span class="n">NoModifier</span>
+        <span class="p">}</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_handlers</span> <span class="o">=</span> <span class="p">{}</span>
+
+    <span class="k">def</span> <span class="nf">add_mouse_handler</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">,</span> <span class="n">callback</span><span class="p">,</span> <span class="n">delegate</span><span class="o">=</span><span class="bp">False</span><span class="p">,</span> <span class="n">args</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Add a new mouse handler</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        event : str, object</span>
+<span class="sd">            see `_get_event`</span>
+<span class="sd">        callback : function</span>
+<span class="sd">            Function to call on event. If delegate is True, the function should return True to</span>
+<span class="sd">            allow the event to propagate, False otherwise.</span>
+<span class="sd">        delegate : bool</span>
+<span class="sd">            If False (the default), events will not propagate when the handler is invoked.</span>
+<span class="sd">            If True, the value of the callback function will determine whether events should</span>
+<span class="sd">            propagate (True to propagate)</span>
+<span class="sd">        args : list, None</span>
+<span class="sd">            Additional arguments will be passed to the callback methods. Arguments that are</span>
+<span class="sd">            instances of MouseState will be set to the given mouse state when the event is fired.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">state</span><span class="p">)</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_event</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">args</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="n">args</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">if</span> <span class="n">event</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_handlers</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_handlers</span><span class="p">[</span><span class="n">event</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_handlers</span><span class="p">[</span><span class="n">event</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">callback</span><span class="p">,</span> <span class="n">state</span><span class="p">,</span> <span class="n">delegate</span><span class="p">,</span> <span class="n">args</span><span class="p">))</span>
+
+    <span class="k">def</span> <span class="nf">get_mouse_state</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">prop</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Return the mouse state</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        prop : str, None</span>
+<span class="sd">            The name of a property or None</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        object</span>
+<span class="sd">            Either a given property (if prop is not None), or the whole mouse state object</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">prop</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_mouse_state</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_mouse_state</span><span class="p">[</span><span class="n">prop</span><span class="p">]</span>
+
+    <span class="k">def</span> <span class="nf">set_mouse_state</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">prop</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Set a mouse state value</span>
+
+<span class="sd">        This may be called to set custom mouse state values. It can also be</span>
+<span class="sd">        used to override existing mouse state values, though those may get</span>
+<span class="sd">        overwritten at the next update.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        prop : str</span>
+<span class="sd">            The name of a property</span>
+<span class="sd">        value : object</span>
+<span class="sd">            The value to set</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_mouse_state</span><span class="p">[</span><span class="n">prop</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
+
+    <span class="k">def</span> <span class="nf">_get_event</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Return a (event, state) tuple for the given event</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        event : str, dictionary</span>
+<span class="sd">            May be an event name, or a dictionary mapping &#39;event&#39; and any other mouse_state properties to values.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        tuple</span>
+<span class="sd">            An (event, state) tuple</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">event_str</span> <span class="o">=</span> <span class="n">event</span>
+        <span class="n">state</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+            <span class="n">event_str</span> <span class="o">=</span> <span class="n">event</span><span class="p">[</span><span class="s">&#39;event&#39;</span><span class="p">]</span>
+            <span class="n">state</span> <span class="o">=</span> <span class="n">event</span>
+            <span class="k">if</span> <span class="s">&#39;modifier&#39;</span> <span class="ow">in</span> <span class="n">state</span><span class="p">:</span>
+                <span class="n">state</span><span class="p">[</span><span class="s">&#39;modifier&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">state</span><span class="p">[</span><span class="s">&#39;modifier&#39;</span><span class="p">])</span>
+
+        <span class="k">return</span> <span class="n">event_str</span><span class="p">,</span> <span class="n">state</span>
+
+    <span class="k">def</span> <span class="nf">_handle_event</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">,</span> <span class="n">event_name</span><span class="p">,</span> <span class="n">default_callback</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Handle an event by calling appropriate handlers</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        event : QtEvent</span>
+<span class="sd">            The event that triggered the call</span>
+<span class="sd">        event_name : str</span>
+<span class="sd">            Event name. See `_get_event`</span>
+<span class="sd">        default_callback : function</span>
+<span class="sd">            Function to call for propagation</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c"># Get handlers</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">handlers</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_handlers</span><span class="p">[</span><span class="n">event_name</span><span class="p">]</span>
+        <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+            <span class="n">default_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">)</span>
+            <span class="k">return</span>
+        <span class="c"># Set non-event specific mouse state</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_mouse_state</span><span class="p">[</span><span class="s">&#39;event&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">event_name</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_mouse_state</span><span class="p">[</span><span class="s">&#39;modifier&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">event</span><span class="o">.</span><span class="n">modifiers</span><span class="p">())</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_mouse_state</span><span class="p">[</span><span class="s">&#39;x&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">event</span><span class="o">.</span><span class="n">pos</span><span class="p">()</span><span class="o">.</span><span class="n">x</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_mouse_state</span><span class="p">[</span><span class="s">&#39;y&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">event</span><span class="o">.</span><span class="n">pos</span><span class="p">()</span><span class="o">.</span><span class="n">y</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_mouse_state</span><span class="p">[</span><span class="s">&#39;delta_x&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_last_position</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">_mouse_state</span><span class="p">[</span><span class="s">&#39;x&#39;</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_mouse_state</span><span class="p">[</span><span class="s">&#39;delta_y&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_last_position</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">_mouse_state</span><span class="p">[</span><span class="s">&#39;y&#39;</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_last_position</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_mouse_state</span><span class="p">[</span><span class="s">&#39;x&#39;</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">_mouse_state</span><span class="p">[</span><span class="s">&#39;y&#39;</span><span class="p">])</span>
+        <span class="c"># Call handlers that match the state</span>
+        <span class="n">propagate</span> <span class="o">=</span> <span class="bp">True</span>
+        <span class="k">for</span> <span class="p">(</span><span class="n">callback</span><span class="p">,</span> <span class="n">state</span><span class="p">,</span> <span class="n">delegate</span><span class="p">,</span> <span class="n">handler_args</span><span class="p">)</span> <span class="ow">in</span> <span class="n">handlers</span><span class="p">:</span>
+            <span class="n">cancel</span> <span class="o">=</span> <span class="bp">False</span>
+            <span class="k">for</span> <span class="n">prop</span> <span class="ow">in</span> <span class="n">state</span><span class="p">:</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_mouse_state</span><span class="p">[</span><span class="n">prop</span><span class="p">]</span> <span class="o">!=</span> <span class="n">state</span><span class="p">[</span><span class="n">prop</span><span class="p">]:</span>
+                    <span class="n">cancel</span> <span class="o">=</span> <span class="bp">True</span>
+                    <span class="k">break</span>
+            <span class="k">if</span> <span class="n">cancel</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="n">args</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="n">handler_args</span><span class="p">:</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">MouseState</span><span class="p">):</span>
+                    <span class="n">args</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">get_mouse_state</span><span class="p">(</span><span class="n">a</span><span class="o">.</span><span class="n">state</span><span class="p">))</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">args</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">a</span><span class="p">)</span>
+            <span class="n">r</span> <span class="o">=</span> <span class="n">callback</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">delegate</span><span class="p">:</span>
+                <span class="n">propagate</span> <span class="o">=</span> <span class="n">propagate</span> <span class="o">&amp;</span> <span class="n">r</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">propagate</span> <span class="o">=</span> <span class="bp">False</span>
+        <span class="c"># Propagate or accept the event</span>
+        <span class="k">if</span> <span class="n">propagate</span><span class="p">:</span>
+            <span class="n">default_callback</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">event</span><span class="o">.</span><span class="n">accept</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">mousePressEvent</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Handle mouse press events</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        event : QtEvent</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">button_map</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="n">QtCore</span><span class="o">.</span><span class="n">Qt</span><span class="o">.</span><span class="n">MidButton</span><span class="p">:</span> <span class="s">&#39;middle&#39;</span><span class="p">,</span>
+            <span class="n">QtCore</span><span class="o">.</span><span class="n">Qt</span><span class="o">.</span><span class="n">LeftButton</span><span class="p">:</span> <span class="s">&#39;left&#39;</span><span class="p">,</span>
+            <span class="n">QtCore</span><span class="o">.</span><span class="n">Qt</span><span class="o">.</span><span class="n">RightButton</span><span class="p">:</span> <span class="s">&#39;right&#39;</span>
+        <span class="p">}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_mouse_state</span><span class="p">[</span><span class="s">&#39;pressed_x&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">event</span><span class="o">.</span><span class="n">pos</span><span class="p">()</span><span class="o">.</span><span class="n">x</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_mouse_state</span><span class="p">[</span><span class="s">&#39;pressed_y&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">event</span><span class="o">.</span><span class="n">pos</span><span class="p">()</span><span class="o">.</span><span class="n">y</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_mouse_state</span><span class="p">[</span><span class="s">&#39;button&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">button_map</span><span class="p">[</span><span class="n">event</span><span class="o">.</span><span class="n">button</span><span class="p">()]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_handle_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="s">&#39;press&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">parent_class</span><span class="o">.</span><span class="n">mousePressEvent</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">mouseMoveEvent</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Handle mouse move events</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        event : QtEvent</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_handle_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="s">&#39;move&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">parent_class</span><span class="o">.</span><span class="n">mouseMoveEvent</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">mouseReleaseEvent</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Handle mouse release events</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        event : QtEvent</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_handle_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="s">&#39;release&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">parent_class</span><span class="o">.</span><span class="n">mouseReleaseEvent</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_mouse_state</span><span class="p">[</span><span class="s">&#39;button&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_mouse_state</span><span class="p">[</span><span class="s">&#39;pressed_at&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">None</span>
+
+    <span class="k">def</span> <span class="nf">mouseDoubleClickEvent</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Handle mouse double click events</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        event : QtEvent</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_handle_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="s">&#39;double-click&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">parent_class</span><span class="o">.</span><span class="n">mouseDoubleClickEvent</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">hoverEnterEvent</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Handle mouse hover enter events</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        event : QtEvent</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_mouse_state</span><span class="p">[</span><span class="s">&#39;over&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">True</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_handle_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="s">&#39;enter&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">parent_class</span><span class="o">.</span><span class="n">hoverEnterEvent</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">hoverMoveEvent</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Handle hoverMoveEvent</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        event : QtEvent</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">over</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_mouse_state</span><span class="p">[</span><span class="s">&#39;over&#39;</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_mouse_state</span><span class="p">[</span><span class="s">&#39;over&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">True</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_handle_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="s">&#39;move&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">parent_class</span><span class="o">.</span><span class="n">hoverMoveEvent</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_mouse_state</span><span class="p">[</span><span class="s">&#39;over&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">over</span>
+
+    <span class="k">def</span> <span class="nf">hoverLeaveEvent</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Handle mouse hover enter events</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        event : QtEvent</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_mouse_state</span><span class="p">[</span><span class="s">&#39;over&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">False</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_handle_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="s">&#39;leave&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">parent_class</span><span class="o">.</span><span class="n">hoverLeaveEvent</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">wheelEvent</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Handle mouse hover enter events</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        event : QtEvent</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_mouse_state</span><span class="p">[</span><span class="s">&#39;wheel_delta&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">event</span><span class="o">.</span><span class="n">delta</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_handle_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="s">&#39;wheel&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">parent_class</span><span class="o">.</span><span class="n">wheelEvent</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_mouse_state</span><span class="p">[</span><span class="s">&#39;wheel_delta&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">None</span>
+</pre></div>
+
+
+<p>It is fairly straightforward to write something similar for keyboard events.</p>
+            </div>
+        </div>
+    </div>
+        </div>
+
+        <div id="footer">
+            <p>Alice online: <a href="http://github.com/aliceh75">GitHub</a> <a href="https://twitter.com/aliceheaton75">Twitter</a></p>
+            <p>Site generated by <a href="http://pelican.readthedocs.org">Pelican</a>, theme loosely based on <a href="https://github.com/tbunnyman/pelican-chunk">Chunk</a></p>
+            <p>All content by Alice Heaton, licensed under a <a rel="license" href="http://creativecommons.org/licenses/by-sa/4.0/">Creative Commons Attribution-ShareAlike 4.0 International License</a>
+               <a rel="license" href="http://creativecommons.org/licenses/by-sa/4.0/"><img alt="Creative Commons Licence" style="border-width:0" src="http://i.creativecommons.org/l/by-sa/4.0/80x15.png" /></a>
+            </p>
+        </div>
+    </div>
+</body>
+</html>
