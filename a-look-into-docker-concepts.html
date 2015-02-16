@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Alice/Development Notes &mdash; A look into Docker concepts</title>
+    <meta charset="utf-8"/>
+    <link rel="stylesheet" type="text/css" href="http://aliceh75.github.io/theme/css/style.css"/>
+</head>
+
+<body>
+    <div id="container">
+        <div id="header">
+                <div id="site-title"><a href="http://aliceh75.github.io">Alice/Development Notes</a></div>
+        </div>
+
+        <div id="contents">
+    <div class="post">
+        <div class="entry-meta">
+            <div class="date">Thu 12 February 2015</div>
+            <div class="author">By Alice Heaton</div>
+                <div class="tag-list">
+                        <a href="http://aliceh75.github.io/tag/docker" rel="tag">#docker</a>
+                </div>
+        </div>
+        <div class="entry-main">
+            <h1 class="entry-title">
+                <a href="http://aliceh75.github.io/a-look-into-docker-concepts" title="A look into Docker concepts"
+                   rel="bookmark">A look into Docker concepts</a>
+            </h1>
+            <div class="entry-content">
+                  <p><a href="https://www.docker.com">Docker</a> is a tool to help in the deployment of applications across host systems. Virtualization, union file systems, image registries, orchestration services - while Docker is a useful tool for staging and deployment, there is a learning curve to get to grips with the whole ecosystem.</p>
+<p>This is not an introduction to Docker, and it is not a tutorial. This is an ad-hoc collection of knowledge pulled from numerous sources across the internet,  aimed at people who've started looking into Docker, possibly created their first containers - and are trying to understand what is happening.</p>
+<p>This was written based on Docker 1.4.1.</p>
+<h2>Virtualization</h2>
+<p>The first, and most important point, to understand is that Docker containers are not virtual machines. Docker uses virtualization technologies to separate process space, memory and file system between containers - but a Docker container does not contain it's own operating system. It uses the host's operating system.</p>
+<p>This means Docker containers are far more efficient than virtual machines - you do not need to simulate the hardware, and you do not need to run another operating system on top of the host. You also do not need to "boot" a container - the startup times are very fast. A container does not automatically start any services - if you want to run a service inside a container, you must start it explicitly (see <em>Running a container</em> for more on this topic).</p>
+<p>If you want to deploy an application that has a hard dependency on a kernel feature, then you must ensure the host kernel has the feature. But in practice this is something quite rare.</p>
+<h2>Union File System</h2>
+<p>Docker uses <a href="http://en.wikipedia.org/wiki/Union_mount">union mount</a> file systems to create it's containers. The idea is that you create an apparent file system based on several file systems layered on top of each other - such that each layer has priority over the layers below. Only the final layer is read/write, all the others being read only.</p>
+<p>The advantage of this approach is that containers are actually lightweight. Say you have a host that runs two containers: one running PostgreSQL and one running Apache2. Assuming that you've build both containers on top of a base Ubuntu 12.04 image, then your host will only store a single copy of the Ubuntu 12.04 base layer and use it for both containers.</p>
+<p>So your Postgresql container would look like this:</p>
+<div class="highlight"><pre><span class="o">--</span> <span class="n">Read</span><span class="o">/</span><span class="n">write</span> <span class="n">layer</span>        <span class="o">--</span>  <span class="o">|</span> <span class="n">A</span> <span class="n">read</span> <span class="n">operation</span> <span class="n">will</span> <span class="n">go</span> <span class="n">down</span> <span class="n">through</span> <span class="n">the</span> <span class="n">layers</span>
+<span class="o">--</span> <span class="n">Postgresql</span> <span class="n">layer</span>        <span class="o">--</span>  <span class="o">|</span> <span class="n">Until</span> <span class="n">it</span> <span class="n">finds</span> <span class="n">a</span> <span class="n">matching</span> <span class="n">file</span><span class="p">.</span>
+<span class="o">--</span> <span class="n">Ubuntu</span> <span class="mf">12.04</span> <span class="n">base</span> <span class="n">layer</span> <span class="o">--</span>  <span class="n">V</span>
+</pre></div>
+
+
+<p>And your Apache2 container would look like this:</p>
+<div class="highlight"><pre><span class="o">--</span> <span class="n">Read</span><span class="o">/</span><span class="n">write</span> <span class="n">layer</span>        <span class="o">--</span>  <span class="o">|</span> 
+<span class="o">--</span> <span class="n">Apache2</span> <span class="n">layer</span>           <span class="o">--</span>  <span class="o">|</span>
+<span class="o">--</span> <span class="n">Ubuntu</span> <span class="mf">12.04</span> <span class="n">base</span> <span class="n">layer</span> <span class="o">--</span>  <span class="n">V</span>
+</pre></div>
+
+
+<p>Your server would only have one copy of the Ubuntu 12.04 base layer. The other advantage of this approach is that you only need to distribute your custom layers - making your container images much lighter to deploy. Common images, such as the Ubuntu 12.04 base image, are fetched from the <a href="https://hub.docker.com">Docker hub</a> (You can use Docker's or roll out your own).</p>
+<h2>Images and containers</h2>
+<p>The second important point to understand is the difference between images and containers. A docker <em>image</em> is a read only layered file system (and meta data). A docker <em>container</em> is build from a docker image, with an additional read/write layer added on top of it.</p>
+<p>A docker <em>image</em> is build from the instructions contained in a <a href="https://docs.docker.com/reference/builder/">Dockerfile</a>. While you may pass additional arguments when creating a container, containers are not created from a set of instructions. A container is, in effect, an instance of an image running on a host.</p>
+<p>Docker does allow you to get into a running container, download additional packages, change configuration on the fly and so on. You can even export such a container - or create an image from it. This is useful for emergency fixes, but by doing so you circumvent what makes Docker useful. The person who deploys an application should be able to pull a new image from the developer, and use that to replace a running containers without any additional steps. If the container has been modified, then this won't be possible.</p>
+<p>So:</p>
+<ul>
+<li>Images should be host independent so you can easily pull an image from any host, and run a container based on that image;</li>
+<li>You do not distribute containers, you distribute images. Containers are created as an instance of an image on a given host;</li>
+<li>You may pass parameters when creating a container to customize it for the current host.</li>
+</ul>
+<p>A consequence of this is that containers should not hold any permanent data. This is what <a href="https://docs.docker.com/userguide/dockervolumes/">Docker volumes</a> are for - you can specify that certain paths are <em>volumes</em> which can, for instance, be mounted from the host. So your Postgresql container would mount it's <code>/var/lib/postgresql/9.3/main</code> from the host. You can then remove that container, pull an upgraded image, and create a new container with the same volume mount. This way you upgraded your database server without having to manually install the server and it's dependencies - but you kept your data intact. (See <em>Data only containers</em> for more on this topic).</p>
+<h2>Running a container</h2>
+<p>A container, once again, is not a server. A container represents a single service. When you run a container, it will run the single command you specified under <code>CMD</code> in the Dockerfile. When that command exits, the container exits.</p>
+<p>This means that this command should not daemonize. Indeed, the "daemonization" part is one of the things docker does for you - running each container in the background. Because many applications daemonize by default, you will often have to specifically instruct them not to. For instance, for a Postgresql server, your <code>CMD</code> line might look like:</p>
+<div class="highlight"><pre><span class="n">CMD</span> <span class="o">/</span><span class="n">usr</span><span class="o">/</span><span class="n">lib</span><span class="o">/</span><span class="n">postgresql</span><span class="o">/</span><span class="mf">9.3</span><span class="o">/</span><span class="n">bin</span><span class="o">/</span><span class="n">postgres</span> <span class="o">-</span><span class="n">D</span> <span class="o">/</span><span class="n">var</span><span class="o">/</span><span class="n">lib</span><span class="o">/</span><span class="n">postgresql</span><span class="o">/</span><span class="mf">9.3</span><span class="o">/</span><span class="n">main</span> <span class="o">-</span><span class="n">c</span> <span class="n">config_file</span><span class="o">=/</span><span class="n">etc</span><span class="o">/</span><span class="n">postgresql</span><span class="o">/</span><span class="mf">9.3</span><span class="o">/</span><span class="n">main</span><span class="o">/</span><span class="n">postgresql</span><span class="p">.</span><span class="n">conf</span>
+</pre></div>
+
+
+<p>Where the <code>-D</code> flag instructs Postgresql not to daemonize. Remember, once again, that a Docker container does not contain an OS and does not boot. It means that services are not started automatically - so when you start your container, PostgreSQL will not start on it's own as it would on a virtual machine - you need to indicate that you want it to start. For some applications, that expect services such as syslog, this may be a problem, and you will need to start all required services explicitly.</p>
+<p>This does not mean that a container should only run a single process. Indeed one of the great advantages of Docker is that it makes it easy to combine multiple components into a single deployable service. For instance imagine an application that saves it's running status to a file. You want to make the status available via HTTP as well. The options are:</p>
+<ol>
+<li>Require the user to install a separate web server and serve the status file;</li>
+<li>Include a lightweight web server within your application to serve the status file;</li>
+<li>Provide a Docker image which contains both your application and a lightweight web server.</li>
+</ol>
+<p>We can clearly see the advantage of the last option: you do not require extra deployment steps from your user, and you also do not need to add an HTTP service within your application.</p>
+<p>To do this however, we need to add within the container a way to manage our multiple processes - remember the container does not run any startup service. There are numerous ways to achieve this - a commonly used tool is <a href="http://supervisord.org/">supervisord</a>. To do this:</p>
+<ul>
+<li>Ensure supervisor is included in the image (e.g.. <code>RUN apt-get install -y supervisord</code>);</li>
+<li>Define each process you want to run in <code>supervisord.conf</code> (and copy that into the image);</li>
+<li>Start your container with <code>CMD ["/usr/bin/supervisord"]</code></li>
+</ul>
+<p>You can read more about this in <a href="https://docs.docker.com/articles/using_supervisord/">Using Supervisor with Docker</a></p>
+<p>A last note on running containers: The <code>docker run</code> command can be misleading because it does two things at once. In effect it first creates (and name) a container; and it then starts this container. It is the equivalent of running <code>docker create</code> followed by <code>docker start</code>.</p>
+<h2>Container logs</h2>
+<p>So we keep the data outside the container - what about logs? Well remembering that a container runs a single process, Docker allows you access to that process' stdout and stderr by doing <code>docker logs &lt;container&gt;</code>. So the easiest approach is to get your dockerized application to send it's log to stdout and stderr. If you are using supervisor, you will need to setup your entries in <code>supervisord.conf</code> to redirect their output to the supervisord output.</p>
+<h2>Data only containers</h2>
+<p>Mounting the host file system in the container can have it's disadvantages - in particular when it comes to mapping uids, gids and permissions. A commonly used approach is <a href="http://container42.com/2013/12/16/persistent-volumes-with-docker-container-as-volume-pattern/">data only containers</a> - using a container which is used only to store data. To do this:</p>
+<ul>
+<li>Ensure that the volumes are declared in the base image using the <code>VOLUME</code> setting in your Dockerfile;</li>
+<li>Create a container using the same base image as the container you want to run (the data only container);</li>
+<li>Create your actual container specifying <code>--volumes-from=&lt;data only container&gt;</code>.</li>
+</ul>
+<p>Your container will run using the volumes from the specified data container. There are two advantages to this approach:</p>
+<ul>
+<li>Since you are using the same base image, uids, gids and permissions will be the same. Also you will save space by not needing a different image;</li>
+<li>You can upgrade your application container - the data only container is persisting the actual data.</li>
+</ul>
+<p>The data is still, of course, stored on the host - within Docker's file hierarchy. But you do not need to worry about uids, gids or permissions. The only downside of this approach is that the volumes will only persist as long as the data container (or another container) are using them. So you have to be extra careful when deleting containers.</p>
+<h2>Connecting containers and orchestration services</h2>
+<p>Images should always be host independent - the whole point being to make deployment easier. We do however need to get our containers to talk to each other! There are multiple approaches:</p>
+<h3>Docker links</h3>
+<p>If you containers are running on the same host, you can use <a href="https://docs.docker.com/userguide/dockerlinks/">Docker Links</a>. This allows you to add, when creating a container, entries in <code>/etc/hosts</code> that map to existing containers. So for example I can build a PostgreSQL slave server image that replicates from a master called "postgres-master". When creating the slave container, I would then specify <code>--link &lt;master container name&gt;:postgres-master</code>. My container would then have an entry in <code>/etc/hosts</code> that links to the master server container.</p>
+<p>The advantage of this approach is that your containers (not just the images) are host independent. The downside is that it only works if all the containers are running on the same host.</p>
+<p>One approach to linking containers across multiple hosts without using an orchestration service is to use <a href="https://docs.docker.com/articles/ambassador_pattern_linking/">ambassador containers</a> - containers that proxy requests between two containers. This way if one container moves host, you only need to reconfigure the proxy containers, and you can leave the application containers intact.</p>
+<h3>Container configuration</h3>
+<p>Sometimes links don't work - for instance in a PostgreSQL server you might want to specify which IP addresses are allowed to connect to the server by specifying an IP address and a netmask. One approach to do this is to use a custom entry point in your docker. If you specify <code>ENTRYPOINT ["/usr/local/bin/run.sh"]</code> in your Dockerfile, the script <code>run.sh</code> will be the base command that starts you container. You can then pass additional parameters to that script, for instance the IP address and netmask. The <code>run.sh</code> script would take care of allowing the given network before starting PostgreSQL. Such a container would be created by doing:</p>
+<div class="highlight"><pre>   <span class="n">docker</span> <span class="n">create</span> <span class="n">postgres_image</span> <span class="mf">192.168.0.0</span><span class="o">/</span><span class="mi">24</span>
+</pre></div>
+
+
+<p>This is a simple approach, and it allows you to run a container that is configured for it's environment based on a generic image. Another similar approach is to use environment variables rather that parameters.</p>
+<h3>Orchestration services</h3>
+<p>Docker links and container configuration only go so far. When you have multiple hosts and multiple containers, it can start to be overwhelming. Orchestration services help manage such setups. There are various third party services such as <a href="https://github.com/clusterhq/flocker">flocker</a>, and <a href="http://blog.docker.com/2014/12/announcing-docker-machine-swarm-and-compose-for-orchestrating-distributed-apps/">Docker have started rolling their own</a>.</p>
+<p>These services provide various tools such as:</p>
+<ul>
+<li>Linking containers across hosts;</li>
+<li>Workload placement across multiple Docker hosts;</li>
+<li>Network routing for live migration of containers.</li>
+</ul>
+<p>There are other services and other tools out there - this is a fast moving ecosystem.</p>
+<h2>Docker is an advanced tool</h2>
+<p>Docker is an environment unto itself, and there are many more things to understand, more gotchas to stumble upon. It is an advanced tool for system administrators who are willing to take the time to understand it. Hopefully this guide will give you a head start!</p>
+            </div>
+        </div>
+    </div>
+        </div>
+
+        <div id="footer">
+            <p>Alice online: <a href="http://github.com/aliceh75">GitHub</a> <a href="https://twitter.com/aliceheaton75">Twitter</a></p>
+            <p>Site generated by <a href="http://pelican.readthedocs.org">Pelican</a>, theme loosely based on <a href="https://github.com/tbunnyman/pelican-chunk">Chunk</a></p>
+            <p>All content by Alice Heaton, licensed under a <a rel="license" href="http://creativecommons.org/licenses/by-sa/4.0/">Creative Commons Attribution-ShareAlike 4.0 International License</a>
+               <a rel="license" href="http://creativecommons.org/licenses/by-sa/4.0/"><img alt="Creative Commons Licence" style="border-width:0" src="http://i.creativecommons.org/l/by-sa/4.0/80x15.png" /></a>
+            </p>
+        </div>
+    </div>
+</body>
+</html>
