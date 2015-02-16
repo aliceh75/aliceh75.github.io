@@ -26,7 +26,8 @@ div.entry-meta {
 	margin-left: -199px;
 	text-align: right;
 	width: 190px;
-    padding-top: 30px;
+        padding-top: 30px;
+        line-height: 1.3em;
 }
 
 div.entry-main {
@@ -99,8 +100,20 @@ div.entry-content h2{
     font-weight: normal;
 }
 
+div.entry-content h3 {
+    font-size: 18px;
+    margin: 10px 0px;
+    font-family: "Montserrat", sans-serif;
+    font-weight: normal;
+}
+
 div.entry-content ul {
     list-style: disc;
+    margin-left: 32px;
+}
+
+div.entry-content ol {
+    list-style: decimal;
     margin-left: 32px;
 }
 
