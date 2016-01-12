@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Alice/Development Notes &mdash; Low bandwidth asset management in Djando</title>
+    <meta charset="utf-8"/>
+    <link rel="stylesheet" type="text/css" href="http://aliceh75.github.io/theme/css/style.css"/>
+</head>
+
+<body>
+    <div id="container">
+        <div id="header">
+                <div id="site-title"><a href="http://aliceh75.github.io">Alice/Development Notes</a></div>
+        </div>
+
+        <div id="contents">
+    <div class="post">
+        <div class="entry-meta">
+            <div class="date">Thu 01 October 2015</div>
+            <div class="author">By Alice Heaton</div>
+                <div class="tag-list">
+                        <a href="http://aliceh75.github.io/tag/django" rel="tag">#django</a>
+                        <a href="http://aliceh75.github.io/tag/python" rel="tag">#python</a>
+                </div>
+        </div>
+        <div class="entry-main">
+            <h1 class="entry-title">
+                <a href="http://aliceh75.github.io/low-bandwidth-asset-management-in-django" title="Low bandwidth asset management in Djando"
+                   rel="bookmark">Low bandwidth asset management in Djando</a>
+            </h1>
+            <div class="entry-content">
+                  <div class="note">This post was originally writen for, and published on, <a href="http://aptivate.org/en/blog/2015/10/01/low-bandwidth-asset-management-in-django/">Aptivate's site</a></div>
+
+<p>Low bandwidth implies high latency - in other words, when implementing a site for low bandwidth conditions we must pay attention to the size of our assets, but also to the packaging and number of assets we include on each page.</p>
+<p>When it comes to Django, the de-facto solution for managing assets is <a href="https://django-assets.readthedocs.org/">django-assets</a>: it will minify and compress our assets and, crucially, allow us to merge all assets of a type into a single file.</p>
+<p>For websites that are mostly server side, and unless our assets change on a very regular basis, this is generally what we want. Not all the CSS or Javascript may be used on all the pages, but the cost of downloading an extra file under high latency condition is often higher than the cost of adding a bit of extra CSS in a file that is, anyway, cached by the browser and only loaded once.</p>
+<p>To be able to build a single file that contains all our CSS (and a single file that contains all our Javascript) <code>django-assets</code> must know about the assets ahead of time - they must be defined statically in one place. This can be in Python code:</p>
+<div class="highlight"><pre><span class="kn">from</span>  <span class="nn">django_assets</span>  <span class="kn">import</span>  <span class="n">Bundle</span><span class="p">,</span>  <span class="n">register</span>
+<span class="n">js</span>  <span class="o">=</span>  <span class="n">Bundle</span><span class="p">(</span><span class="s">&#39;common/jquery.js&#39;</span><span class="p">,</span>  <span class="s">&#39;site/base.js&#39;</span><span class="p">,</span>  <span class="s">&#39;site/widgets.js&#39;</span><span class="p">,</span>
+              <span class="n">filters</span><span class="o">=</span><span class="s">&#39;jsmin&#39;</span><span class="p">,</span>  <span class="n">output</span><span class="o">=</span><span class="s">&#39;gen/packed.js&#39;</span><span class="p">)</span>
+<span class="n">register</span><span class="p">(</span><span class="s">&#39;js_all&#39;</span><span class="p">,</span>  <span class="n">js</span><span class="p">)</span>
+</pre></div>
+
+
+<p>Or in a template:</p>
+<div class="highlight"><pre>{%  load  assets  %}
+{%  assets  &quot;js_all&quot;  %}
+      <span class="nt">&lt;script </span><span class="na">type=</span><span class="s">&quot;text/javascript&quot;</span> <span class="na">src=</span><span class="s">&quot;{{  ASSET_URL  }}&quot;</span><span class="nt">&gt;&lt;/script&gt;</span>
+{%  endassets  %}
+</pre></div>
+
+
+<p>But in both cases the list of resources that is to be included in the same file must be declared in the same place. There is no way for two unrelated pieces of code to declare which assets they want, and have those included in a single asset file. This is a problem, because we lose a lot of information and structure - there is a link between the Python code that generates a page, the CSS that styles it and the Javascript that manipulates it. By moving all our assets in a single place, we lose that link.</p>
+<p>Here is a simple approach to address this problem and re-introduce the structure that we would otherwise lose:</p>
+<ul>
+<li>Include all resources statically in one (python) file, <code>assets.py</code>;</li>
+<li>In the same file create a function named <code>require_assets</code>. All this function does is raise an exception if the required asset is not part of the list that gets build statically;</li>
+<li>Code that expects or needs a particular asset, say <code>my_asset.css</code>, can than invoke <code>require_asset('my_asset.css')</code>. If this is missing, an exception will be raised.</li>
+</ul>
+<p>This way we re-introduce the link that we have lost when we moved our list of assets to <code>asset.py</code>: If I read the python code that generates a page, and I see a call to <code>require_asset</code> I know which assets are expected for that page. Conversely, if I wonder why a certain asset is included, I can search the code for calls to <code>require_asset</code> that include that asset. Raising an exception in <code>require_asset</code> also ensures we do not forget to add our assets in <code>assets.py</code>.</p>
+<p>Here is an example implementation of <code>assets.py</code>:</p>
+<div class="highlight"><pre><span class="kn">from</span> <span class="nn">django_assets</span> <span class="kn">import</span> <span class="n">Bundle</span><span class="p">,</span> <span class="n">register</span>
+
+<span class="n">_assets</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="s">&#39;fonts/font-awesome-4.3.0/css/font-awesome.css&#39;</span><span class="p">,</span>
+    <span class="s">&#39;less/bootstrap.less&#39;</span><span class="p">,</span>
+    <span class="s">&#39;mysite/mysite.css&#39;</span><span class="p">,</span>
+    <span class="s">&#39;js/jquery.min.js&#39;</span><span class="p">,</span>
+    <span class="s">&#39;bootstrap/js/bootstrap.min.js&#39;</span><span class="p">,</span>
+<span class="p">]</span>
+
+
+<span class="k">class</span> <span class="nc">AssetMissing</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot; Exception raised when an asset is missing &quot;&quot;&quot;</span>
+    <span class="k">pass</span>
+
+
+<span class="k">def</span> <span class="nf">require_assets</span><span class="p">(</span><span class="o">*</span><span class="n">assets</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot; Ensure the given assets are included in the page&#39;s assets</span>
+<span class="sd">    Args:</span>
+<span class="sd">        assets: List of assets</span>
+<span class="sd">    Raises:</span>
+<span class="sd">        AssetMissing: If any of the asset is missing</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">global</span> <span class="n">_assets</span>
+    <span class="k">for</span> <span class="n">asset</span> <span class="ow">in</span> <span class="n">assets</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">asset</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">_assets</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">AssetMissing</span><span class="p">(</span><span class="s">&quot;Missing asset: {}&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">asset</span><span class="p">))</span>
+
+
+<span class="n">register</span><span class="p">(</span><span class="s">&#39;javascript_assets&#39;</span><span class="p">,</span> <span class="n">Bundle</span><span class="p">(</span>
+    <span class="o">*</span><span class="p">[</span><span class="n">a</span> <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="n">_assets</span> <span class="k">if</span> <span class="n">a</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s">&#39;.js&#39;</span><span class="p">)],</span>
+    <span class="n">filters</span><span class="o">=</span><span class="s">&#39;jsmin&#39;</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="s">&#39;js/javascript_assets.js&#39;</span>
+<span class="p">))</span>
+<span class="n">register</span><span class="p">(</span><span class="s">&#39;css_assets&#39;</span><span class="p">,</span> <span class="n">Bundle</span><span class="p">(</span>
+    <span class="o">*</span><span class="p">[</span><span class="n">a</span> <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="n">_assets</span> <span class="k">if</span> <span class="n">a</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s">&#39;.css&#39;</span><span class="p">)</span> <span class="ow">or</span> <span class="n">a</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s">&#39;.less&#39;</span><span class="p">)],</span>
+    <span class="n">filters</span><span class="o">=</span><span class="s">&#39;less, cssmin&#39;</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="s">&#39;css/css_assets.css&#39;</span><span class="p">,</span>
+    <span class="n">depends</span><span class="o">=</span><span class="p">[</span><span class="s">&#39;less/*.less&#39;</span><span class="p">]</span>
+<span class="p">))</span>
+</pre></div>
+
+
+<p>This is a very lightweight implementation, and there are a number of obvious improvements that could be done:</p>
+<ul>
+<li>Dependency management;</li>
+<li>Versioning;</li>
+<li>A template tag to call require_asset from templates.</li>
+</ul>
+<p>But already this simple and lightweight implementation re-introduces the semantics and structure that we had lost when moving all our asset declaration in a single place.</p>
+            </div>
+        </div>
+    </div>
+        </div>
+
+        <div id="footer">
+            <p>Alice online: <a href="http://github.com/aliceh75">GitHub</a> <a href="https://twitter.com/aliceheaton75">Twitter</a></p>
+            <p>Site generated by <a href="http://pelican.readthedocs.org">Pelican</a>, theme loosely based on <a href="https://github.com/tbunnyman/pelican-chunk">Chunk</a></p>
+            <p>All content by Alice Heaton, licensed under a <a rel="license" href="http://creativecommons.org/licenses/by-sa/4.0/">Creative Commons Attribution-ShareAlike 4.0 International License</a>
+               <a rel="license" href="http://creativecommons.org/licenses/by-sa/4.0/"><img alt="Creative Commons Licence" style="border-width:0" src="http://i.creativecommons.org/l/by-sa/4.0/80x15.png" /></a>
+            </p>
+        </div>
+    </div>
+</body>
+</html>

@@ -140,6 +140,10 @@ div.entry-content code {
     font-size: 14px;
 }
 
+div.entry-content .note {
+    font-size: 11px;
+}
+
 /* Post metadata styling */
 div.entry-meta {
 	text-align: right;
