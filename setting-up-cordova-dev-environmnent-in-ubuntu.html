@@ -33,43 +33,43 @@
 <h2>Download the Android SDK</h2>
 <p>The Android SDK is Google's development platform for Android applications. Even though we're going to do cross platform development using Cordova we still need to install the SDK so Cordova can build and deploy the Android version of the application.</p>
 <p>The Android SDK can be downloaded directly from Google. I install it under <code>/usr/local</code>:</p>
-<div class="highlight"><pre><span class="n">cd</span> <span class="o">/</span><span class="n">usr</span><span class="o">/</span><span class="n">local</span>
-<span class="n">sudo</span> <span class="n">wget</span> <span class="n">http</span><span class="o">:</span><span class="c1">//dl.google.com/android/android-sdk_r24.3.4-linux.tgz</span>
-<span class="n">sudo</span> <span class="n">tar</span> <span class="o">-</span><span class="n">xzf</span> <span class="n">android</span><span class="o">-</span><span class="n">sdk_r23</span><span class="mf">.3.4</span><span class="o">-</span><span class="n">linux</span><span class="p">.</span><span class="n">tgz</span>
-<span class="n">sudo</span> <span class="n">chmod</span> <span class="n">ugo</span><span class="o">+</span><span class="n">x</span> <span class="o">/</span><span class="n">usr</span><span class="o">/</span><span class="n">local</span><span class="o">/</span><span class="n">android</span><span class="o">-</span><span class="n">sdk</span><span class="o">-</span><span class="n">linux</span><span class="o">/</span><span class="n">tools</span><span class="o">/</span><span class="n">android</span>
+<div class="highlight"><pre><span class="nb">cd</span> /usr/local
+sudo wget http://dl.google.com/android/android-sdk_r24.3.4-linux.tgz
+sudo tar -xzf android-sdk_r23.3.4-linux.tgz
+sudo chmod ugo+x /usr/local/android-sdk-linux/tools/android
 </pre></div>
 
 
 <p>You should then update the SDK to the latest version, and download the Android APIs for the version you want to build for. You can do this using the Android SDK provided GUI tool:</p>
-<div class="highlight"><pre><span class="n">gksudo</span> <span class="o">/</span><span class="n">usr</span><span class="o">/</span><span class="n">local</span><span class="o">/</span><span class="n">android</span><span class="o">-</span><span class="n">sdk</span><span class="o">-</span><span class="n">linux</span><span class="o">/</span><span class="n">tools</span><span class="o">/</span><span class="n">android</span> <span class="n">update</span> <span class="n">sdk</span>
+<div class="highlight"><pre>gksudo /usr/local/android-sdk-linux/tools/android update sdk
 </pre></div>
 
 
 <p>By default this will install the latest version of the tools, and the latest version of the Android APIs (You'll need to accept a number of licences). If you want to develop for older versions of Android, make sure to select the APIs accordingly.</p>
 <p>You will need the <code>tools</code> and <code>platform-tools</code> folders in your path. I add this to my <code>~/.bashrc</code>:</p>
-<div class="highlight"><pre><span class="n">PATH</span><span class="o">=</span><span class="s">&quot;$PATH:/usr/local/android-sdk-linux/tools:/usr/local/android-sdk-linux/platform-tools&quot;</span>
+<div class="highlight"><pre><span class="nv">PATH</span><span class="o">=</span><span class="s2">&quot;</span>$<span class="s2">PATH:/usr/local/android-sdk-linux/tools:/usr/local/android-sdk-linux/platform-tools&quot;</span>
 </pre></div>
 
 
 <h2>Install Cordova, and create a skeleton application</h2>
 <p>The easy way is to use <a href="https://www.npmjs.com/">npm</a>, the Javascript package manager, which you may need to install first:</p>
-<div class="highlight"><pre><span class="n">sudo</span> <span class="n">apt</span><span class="o">-</span><span class="n">get</span> <span class="n">install</span> <span class="n">npm</span>
+<div class="highlight"><pre>sudo apt-get install npm
 </pre></div>
 
 
 <p>You can then install Cordova globally:</p>
-<div class="highlight"><pre><span class="n">sudo</span> <span class="n">npm</span> <span class="n">install</span> <span class="o">-</span><span class="n">g</span> <span class="n">cordova</span>
+<div class="highlight"><pre>sudo npm install -g cordova
 </pre></div>
 
 
 <p>Note that if you want to run on older Android versions (eg. 2.3), you will need an older version of Cordova. So for Android 2.3 support, you would want to install:</p>
-<div class="highlight"><pre><span class="n">sudo</span> <span class="n">npm</span> <span class="n">install</span> <span class="o">-</span><span class="n">g</span> <span class="s">&quot;cordova@4.3.0&quot;</span>
+<div class="highlight"><pre>sudo npm install -g <span class="s2">&quot;cordova@4.3.0&quot;</span>
 </pre></div>
 
 
 <p>Finally create a skeleton project:</p>
-<div class="highlight"><pre><span class="n">cd</span> <span class="o">~/</span><span class="n">projects</span>
-<span class="n">cordova</span> <span class="n">create</span> <span class="n">myapp</span> <span class="n">com</span><span class="p">.</span><span class="n">example</span><span class="p">.</span><span class="n">myapp</span> <span class="n">MyApp</span>
+<div class="highlight"><pre><span class="nb">cd</span> ~/projects
+cordova create myapp com.example.myapp MyApp
 </pre></div>
 
 
@@ -82,20 +82,20 @@
 </ul>
 <p>I exclude both the <code>platforms</code> and <code>plugins</code> folders from version control. I have not had the need to edit any of their content, and they can easily be generated by invoking the appropriate cordova commands. If you were to edit some files under <code>platforms</code>, you would probably want to exclude some of it's sub-folders, as build binaries go there.</p>
 <p>So my <code>.gitignore</code> includes:</p>
-<div class="highlight"><pre><span class="n">platforms</span><span class="o">/</span>
-<span class="n">plugins</span>
+<div class="highlight"><pre>platforms/
+plugins
 </pre></div>
 
 
 <h2>Add Android platform to your project</h2>
 <p>You add the android platform by doing:</p>
-<div class="highlight"><pre><span class="n">cd</span> <span class="o">~/</span><span class="n">projects</span><span class="o">/</span><span class="n">myapp</span>
-<span class="n">cordova</span> <span class="n">platform</span> <span class="n">add</span> <span class="n">android</span>
+<div class="highlight"><pre><span class="nb">cd</span> ~/projects/myapp
+cordova platform add android
 </pre></div>
 
 
 <p>You also use the cordova command line to add plugins by running, for example:</p>
-<div class="highlight"><pre><span class="n">cordova</span> <span class="n">plugin</span> <span class="n">add</span> <span class="n">org</span><span class="p">.</span><span class="n">apache</span><span class="p">.</span><span class="n">cordova</span><span class="p">.</span><span class="n">device</span>
+<div class="highlight"><pre>cordova plugin add org.apache.cordova.device
 </pre></div>
 
 
@@ -108,33 +108,33 @@
 <p>The Android SDK runs a server used to connect to attached Android devices - the <a href="https://developer.android.com/tools/help/adb.html">Android Debug Bridge</a> known as <code>adb</code>.</p>
 <p>The <code>adb</code> server must be run as root. However Cordova commands that require it will launch it as the current user - causing cryptic errors such as "no target specified" when you try to run the application. </p>
 <p>To prevent this from happening you must first launch the adb server as root. You can start the server as a service at every boot, or just start it manually at the beginning of every session:</p>
-<div class="highlight"><pre><span class="n">sudo</span> <span class="n">adb</span> <span class="n">start</span><span class="o">-</span><span class="n">server</span>
+<div class="highlight"><pre>sudo adb start-server
 </pre></div>
 
 
 <p>If you forgot to start it, you must stop it and re-start it:</p>
-<div class="highlight"><pre><span class="n">sudo</span> <span class="n">adb</span> <span class="n">kill</span><span class="o">-</span><span class="n">server</span>
-<span class="n">sudo</span> <span class="n">adb</span> <span class="n">start</span><span class="o">-</span><span class="n">server</span>
+<div class="highlight"><pre>sudo adb kill-server
+sudo adb start-server
 </pre></div>
 
 
 <h2>Check it's working</h2>
 <p>We're ready to check if it's working! Edit the index file to put a success message:</p>
-<div class="highlight"><pre><span class="nx">cd</span> <span class="err">~</span><span class="p">/</span><span class="nx">projects</span><span class="p">/</span><span class="nx">myapp</span><span class="p">/</span><span class="nx">www</span>
-<span class="nx">echo</span> <span class="s1">&#39;&lt;html&gt;&lt;body&gt;success&lt;/body&gt;&lt;/html&gt;&#39;</span> <span class="o">&gt;</span> <span class="nx">index.html</span>
+<div class="highlight"><pre><span class="nb">cd</span> ~/projects/myapp/www
+<span class="nb">echo</span> <span class="s1">&#39;&lt;html&gt;&lt;body&gt;success&lt;/body&gt;&lt;/html&gt;&#39;</span> &gt; index.html
 </pre></div>
 
 
 <p>You will need to enable debug mode on your phone - depending on your Android version this may require finding some hidden menu items! See the tutorial at <a href="https://www.kingoapp.com/root-tutorials/how-to-enable-usb-debugging-mode-on-android.htm">https://www.kingoapp.com/root-tutorials/how-to-enable-usb-debugging-mode-on-android.htm</a>.</p>
 <p>This done, you just need to plug your phone in and run:</p>
-<div class="highlight"><pre><span class="n">cordova</span> <span class="n">run</span> <span class="n">android</span>
+<div class="highlight"><pre>cordova run android
 </pre></div>
 
 
 <p>Tada! Well, hopefully, Tada. It's possible you'll encounter other issues - it took me a bit of research to get this far. Many other people have been there before, so with a bit of online search you should be able to find the solution to any problem.</p>
 <h2>Debuging</h2>
 <p>You can view the logs from the phone by running:</p>
-<div class="highlight"><pre><span class="n">adb</span> <span class="n">logcat</span>
+<div class="highlight"><pre>adb logcat
 </pre></div>
             </div>
         </div>

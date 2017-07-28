@@ -53,12 +53,12 @@
 <p>And that's it - it is really simple to implement. The tasks need to be an object with a <code>run</code> method, for instance:</p>
 <div class="highlight"><pre><span class="k">class</span> <span class="nc">MyTask</span><span class="p">():</span>
     <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">param</span><span class="p">):</span>
-        <span class="c"># This is run on the main process, when the task is crated</span>
+        <span class="c1"># This is run on the main process, when the task is crated</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">param</span> <span class="o">=</span> <span class="n">param</span>
 
     <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="c"># This is run on the child process. We can do something with param</span>
-        <span class="c"># (note that we must be able to pickle param)</span>
+        <span class="c1"># This is run on the child process. We can do something with param</span>
+        <span class="c1"># (note that we must be able to pickle param)</span>
         <span class="k">pass</span>
 </pre></div>
 
@@ -105,7 +105,7 @@
     <span class="k">def</span> <span class="nf">add</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">task</span><span class="p">):</span>
         <span class="n">r</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_pool</span><span class="o">.</span><span class="n">apply_async</span><span class="p">(</span><span class="n">_worker</span><span class="p">,</span> <span class="p">(</span><span class="n">task</span><span class="p">,))</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_tasks</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">r</span><span class="p">)</span>
-        <span class="c"># Call flush here to ensure we clean up even if length/processed are never called.</span>
+        <span class="c1"># Call flush here to ensure we clean up even if length/processed are never called.</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_flush</span><span class="p">()</span>
 
     <span class="k">def</span> <span class="nf">length</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -147,14 +147,14 @@
     <span class="k">try</span><span class="p">:</span>
         <span class="n">desc</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">task</span><span class="p">)</span>
     <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
-        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s">&quot;Worker {} failed to get task description. {}&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="nb">id</span><span class="p">,</span> <span class="n">format_exc</span><span class="p">()))</span>
-        <span class="n">desc</span> <span class="o">=</span> <span class="s">&#39;(unknown)&#39;</span>
-    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s">&quot;Worker {} processing task {}&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="nb">id</span><span class="p">,</span> <span class="n">desc</span><span class="p">))</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Worker {} failed to get task description. {}&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="nb">id</span><span class="p">,</span> <span class="n">format_exc</span><span class="p">()))</span>
+        <span class="n">desc</span> <span class="o">=</span> <span class="s1">&#39;(unknown)&#39;</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Worker {} processing task {}&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="nb">id</span><span class="p">,</span> <span class="n">desc</span><span class="p">))</span>
     <span class="k">try</span><span class="p">:</span>
         <span class="n">task</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
     <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
-        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s">&quot;Worker {} failed task {}. {}&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="nb">id</span><span class="p">,</span> <span class="n">desc</span><span class="p">,</span> <span class="n">format_exc</span><span class="p">()))</span>
-    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s">&quot;Worker {} done with task {}&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="nb">id</span><span class="p">,</span> <span class="n">desc</span><span class="p">,</span> <span class="n">e</span><span class="p">))</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Worker {} failed task {}. {}&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="nb">id</span><span class="p">,</span> <span class="n">desc</span><span class="p">,</span> <span class="n">format_exc</span><span class="p">()))</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Worker {} done with task {}&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="nb">id</span><span class="p">,</span> <span class="n">desc</span><span class="p">,</span> <span class="n">e</span><span class="p">))</span>
     <span class="k">return</span> <span class="bp">True</span>
 </pre></div>
 
@@ -174,16 +174,16 @@
 
 
 <p>You can then replace the application's log handler with an instance of this one. For example in Flask:</p>
-<div class="highlight"><pre><span class="c"># Set up the multiprocessing logger</span>
+<div class="highlight"><pre><span class="c1"># Set up the multiprocessing logger</span>
 <span class="n">m_logger</span> <span class="o">=</span> <span class="n">multiprocessing</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span>
 <span class="n">m_logger</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">)</span>
 <span class="n">m_logger</span><span class="o">.</span><span class="n">addHandler</span><span class="p">(</span><span class="n">login</span><span class="o">.</span><span class="n">StreamHandler</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="p">))</span>
 
-<span class="c"># Remove any existing log handlers in the application handler</span>
+<span class="c1"># Remove any existing log handlers in the application handler</span>
 <span class="k">while</span> <span class="nb">len</span><span class="p">(</span><span class="n">app</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">handlers</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
     <span class="n">app</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">removeHandler</span><span class="p">(</span><span class="n">app</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">handlers</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
 
-<span class="c"># And add our custom handler to the application logger</span>
+<span class="c1"># And add our custom handler to the application logger</span>
 <span class="n">app</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">)</span>
 <span class="n">app</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">addHandler</span><span class="p">(</span><span class="n">MultiprocessingLogHandler</span><span class="p">())</span>
 </pre></div>

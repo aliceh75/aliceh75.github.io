@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Alice/Development Notes &mdash; State in back and front end web technologies</title>
+    <meta charset="utf-8"/>
+    <link rel="stylesheet" type="text/css" href="http://aliceh75.github.io/theme/css/style.css"/>
+</head>
+
+<body>
+    <div id="container">
+        <div id="header">
+                <div id="site-title"><a href="http://aliceh75.github.io">Alice/Development Notes</a></div>
+        </div>
+
+        <div id="contents">
+    <div class="post">
+        <div class="entry-meta">
+            <div class="date">Thu 16 March 2017</div>
+            <div class="author">By Alice Heaton</div>
+                <div class="tag-list">
+                        <a href="http://aliceh75.github.io/tag/architecture" rel="tag">#architecture</a>
+                </div>
+        </div>
+        <div class="entry-main">
+            <h1 class="entry-title">
+                <a href="http://aliceh75.github.io/state-in-back-and-front-end-web-technologies" title="State in back and front end web technologies"
+                   rel="bookmark">State in back and front end web technologies</a>
+            </h1>
+            <div class="entry-content">
+                  <p>Processing user requests in the backend component of websites is something that feels like a mostly solved problem. Doing the same in frontend web applications is on the other hand something that is still being improved on all the time. Here I look at how managing <a href="https://en.wikipedia.org/wiki/State_(computer_science)">state</a> differs in the two environment, and how this affects application architecture.</p>
+<h2>State</h2>
+<p>HTTP requests are <a href="https://en.wikipedia.org/wiki/Stateless_protocol">stateless</a>, and most backend frameworks have been build to be stateless at that level. Each request comes through the backend pipeline (typically, but not always, based on a <a href="https://en.wikipedia.org/wiki/Model–view–controller">Model View Controller</a> workflow) as a fresh request. Even when we use <a href="https://en.wikipedia.org/wiki/HTTP_cookie">Cookies</a> we use them as another piece of stored data; our application does not keep a running state.</p>
+<p>This gives backend applications a very clean workflow: one request comes in, it is processed in a linear fashion, and one output comes out. It doesn't matter if we get 1000 simultaneous requests, as each is processed through it's own independent pipeline. Typically additional or longer running tasks are delegated to separate workers using <a href="https://en.wikipedia.org/wiki/Message_queue">message queues</a>.</p>
+<p>As a programmer (of <a href="https://en.wikipedia.org/wiki/Imperative_programming">imperative languages</a>), I tend to expect state - when I set a variable to a value, I expect it to stay set. But as a programmer I also understand <a href="https://en.wikipedia.org/wiki/Scope_(computer_science)">scope</a>. The nature of HTTP made it that the scope of my entire backend application is a single web request. </p>
+<p>This was the simplest approach - it is the nature of the web that imposed this more than architectural considerations.</p>
+<p>When it came to front end applications however, the scope of the execution was not limited - the programming model was different, because we had state. At first this felt like a release from the constraints of statelessness: we could just keep a variable to let us know where the user is at, we didn't need to work it out again and again for every interaction. If we generated a widget and put it on the page, <em>it just stayed there</em>, we didn't need to create it every time.</p>
+<p>Great? Well, it turned out it wasn't. As front end applications became more and more advanced, this model showed it's limits: click handlers, keyboard handlers, ajax handlers all trying to modify the same state at the same time made for complicated debugging. To address this complexity, front end developers have come up with solutions such as state containers in <a href="http://redux.js.org/">redux</a>. Essentially this removes state manipulation away from your widgets and click handlers. Instead of manipulating the application state directly, your handlers emit actions (e.g. "the user has completed to-do with id ...") which are then caught by your state container, which then modifies the state accordingly. The state is modified in one place, and at one time.</p>
+<p>What backend applications never had - state - is something frontend applications are still learning to tame. Having had to work this out, front end frameworks have gone one step further: with <a href="http://redux.js.org">redux</a> the state is never actually modified, but rather a new state is generated from the existing state and the action. This means no code ever actually manipulates the state, and offers benefits such as easy undo and time travel debugging.</p>
+<h2>DOM Manipulation</h2>
+<p>As backend application do not run in the browser, they have no access to the <a href="https://en.wikipedia.org/wiki/Document_Object_Model">Document Object Model (DOM)</a>. Backend application have no choice but to generate the HTML at every request - they cannot modify what is not there. Part of the HTML may be cached and re-used - but this is just a short cut when we know is hasn't changed: we are still generating the whole HTML (or JSON, or XML for that matter) for the request.</p>
+<p>Javascript applications on the other hand have direct access to the DOM. As web developers our first use of Javascript was to <a href="https://en.wikipedia.org/wiki/Progressive_enhancement">enhance the page</a>, typically by doing in-place modifications of the DOM - if a widget got updated we could simply modify it in place, rather than re-generate the full HTML. As Javascript applications became more complex, we kept to this approach: but again this had it's difficulties. As things get complicated, it becomes harder to track what modifications have already been done to your DOM as multiple parts of your application modify the same things.</p>
+<p>And so front end framework such as <a href="https://facebook.github.io/react/">React</a> or <a href="https://angular.io/">Angular</a> decided to go the other way: they never modify the DOM directly, instead whenever an input changes, the relevant HTML is re-generated. You don't need to handle the state of your widget or account for existing modifications. You just need to express how, given a set of input, the widget is rendered. In React for example your components never modify the DOM - they are rendered using <a href="https://en.wikipedia.org/wiki/Pure_function">pure functions</a> which re-generate the component's HTML whenever one of it's input is modified. React and other frameworks use a <a href="https://en.wikipedia.org/wiki/React_(JavaScript_library)#Virtual_DOM">Virtual DOM</a> to speed up the re-rendering of whole pages - but this is done under the hood, and users of the framework need not know of it.</p>
+<h2>Managing state</h2>
+<p>State is, of course, what backend are often about - not the execution state as I have shown, but the state of your application. The backend deals with storing all the data, with scaling, with ensuring updates are propagated, with resolving state conflicts. And in that respect, managing state in the backend is not a solved a problem. </p>
+<p>Architectures will change and new ideas will come up, both on the backend and frontend. There may or may not be set architecture or programming paradigms that are better than others. What is clear is that managing state (along with processing user requests) is one of the fundamental elements that define our architecture, and that getting it right is as difficult as it is important.</p>
+            </div>
+        </div>
+    </div>
+        </div>
+
+        <div id="footer">
+            <p>Alice online: <a href="http://github.com/aliceh75">GitHub</a> <a href="https://twitter.com/aliceheaton75">Twitter</a></p>
+            <p>Site generated by <a href="http://pelican.readthedocs.org">Pelican</a>, theme loosely based on <a href="https://github.com/tbunnyman/pelican-chunk">Chunk</a></p>
+            <p>All content by Alice Heaton, licensed under a <a rel="license" href="http://creativecommons.org/licenses/by-sa/4.0/">Creative Commons Attribution-ShareAlike 4.0 International License</a>
+               <a rel="license" href="http://creativecommons.org/licenses/by-sa/4.0/"><img alt="Creative Commons Licence" style="border-width:0" src="http://i.creativecommons.org/l/by-sa/4.0/80x15.png" /></a>
+            </p>
+        </div>
+    </div>
+</body>
+</html>

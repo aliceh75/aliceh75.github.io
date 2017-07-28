@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Alice/Development Notes &mdash; Setting up an ejabberd server in Debian Jessie</title>
+    <meta charset="utf-8"/>
+    <link rel="stylesheet" type="text/css" href="http://aliceh75.github.io/theme/css/style.css"/>
+</head>
+
+<body>
+    <div id="container">
+        <div id="header">
+                <div id="site-title"><a href="http://aliceh75.github.io">Alice/Development Notes</a></div>
+        </div>
+
+        <div id="contents">
+    <div class="post">
+        <div class="entry-meta">
+            <div class="date">Sun 05 March 2017</div>
+            <div class="author">By Alice Heaton</div>
+                <div class="tag-list">
+                        <a href="http://aliceh75.github.io/tag/chat" rel="tag">#chat</a>
+                        <a href="http://aliceh75.github.io/tag/ejabberd" rel="tag">#ejabberd</a>
+                </div>
+        </div>
+        <div class="entry-main">
+            <h1 class="entry-title">
+                <a href="http://aliceh75.github.io/drafts/setting-up-ejabberd-server-in-debian-jessie" title="Setting up an ejabberd server in Debian Jessie"
+                   rel="bookmark">Setting up an ejabberd server in Debian Jessie</a>
+            </h1>
+            <div class="entry-content">
+                  <p>I wanted to set up a small chat and messenging server for a small group of people. After some research I decided to go for <a href="https://www.ejabberd.im/">ejabberd</a>, and here I describe how I set it up for my specific use case on <a href="https://wiki.debian.org/DebianJessie">Debian Jessie</a>:</p>
+<ul>
+<li>"Closed" instance, made for a small group of people, not for comunicating with external people;</li>
+<li>Multi user chat rooms;</li>
+<li>File uploads (in particular to allow picture sharing);</li>
+<li>Everyone can see everyone by default (no need to invite users).</li>
+</ul>
+<p>I will also look at various clients that support the features I needed.</p>
+<h2>Why ejabberd</h2>
+<p>I prefer a solution based on open standards, in that case <a href="https://xmpp.org">XMPP</a>, so people can easily use their own client to connect if they already use one. There are chat rooms and messenging software that implement their own interface with their own protocols - I have not looked into those. Amongst the <a href="https://xmpp.org/software/servers.html">available open source XMPP servers</a>, and after a small ammount of research, the four that I have seen recomended are: <a href="https://www.ejabberd.im/">ejabberd</a>, <a href="http://prosody.im/">Prosody</a>, <a href="https://igniterealtime.org/projects/openfire/index.jsp">openfire</a> and <a href="http://www.tigase.net/">tigase</a>.</p>
+<p>Openfire and Tigase didn't have Debian packages, so I didn't consider them - having a Debian package means I will get security updates as part of my system updates, which is quite important. Having to manually update separate software can be demanding when this is a service you provide in your free time.</p>
+<p>The first I tried was ejabberd - and it had all the features I needed, and was simple to configure. So I never tried Prosody! I have read that Prosody has a smaller footprint, though I haven't found ejabberd to be too demanding so far.</p>
+<h2>Basic installation and configuration</h2>
+<p>As mentioned, ejabberd has a debian package. So installation is as simple as:</p>
+<div class="highlight"><pre>    sudo apt-get install ejabberd
+</pre></div>
+
+
+<p>The main confiuration file is in <code>/etc/ejabberd/ejabberd.yml</code>, which uses the <a href="https://en.wikipedia.org/wiki/YAML">YAML</a> file format. Note that when you search online you will find a lot of people giving instructions that use a different configuration file format - that is ejabberd's <a href="https://docs.ejabberd.im/admin/configuration/#legacy-configuration-file">legacy configuration file format</a> - which is still supported but deprecated. When in doubt about instructions I find only I always check the <a href="https://docs.ejabberd.im">ejabberd documentation</a> which is relatively complete.</p>
+<p>So these are the initial changes I did in the configuration file:</p>
+<h3>Change the host</h3>
+<p>I changed the host, which is done the <code>hosts</code> section of the configuration, by changing from:</p>
+<div class="highlight"><pre><span class="l l-Scalar l-Scalar-Plain">hosts</span><span class="p p-Indicator">:</span>
+  <span class="p p-Indicator">-</span> <span class="s">&quot;localhost&quot;</span>
+</pre></div>
+
+
+<p>to:</p>
+<div class="highlight"><pre><span class="l l-Scalar l-Scalar-Plain">hosts</span><span class="p p-Indicator">:</span>
+  <span class="p p-Indicator">-</span> <span class="s">&quot;chat.example.com&quot;</span>
+</pre></div>
+
+
+<h3>Require STARTTLS</h3>
+<p>To avoid people using unsecure clients that send password unencrypted, I force the use of STARTTLS. To do this I edited the <code>listen</code> section of the configuration (which defines enabled services and their configuration), and added the line <code>starttls_required: true</code> in the block which defines the Client To Server (c2s) service configuration:</p>
+<div class="highlight"><pre><span class="l l-Scalar l-Scalar-Plain">listen</span><span class="p p-Indicator">:</span> 
+  <span class="p p-Indicator">-</span> 
+    <span class="l l-Scalar l-Scalar-Plain">port</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">5222</span>
+    <span class="l l-Scalar l-Scalar-Plain">ip</span><span class="p p-Indicator">:</span> <span class="s">&quot;::&quot;</span>
+    <span class="l l-Scalar l-Scalar-Plain">module</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">ejabberd_c2s</span>
+    <span class="c1">##</span>
+    <span class="c1">## If TLS is compiled in and you installed a SSL</span>
+    <span class="c1">## certificate, specify the full path to the</span>
+    <span class="c1">## file and uncomment this line:</span>
+    <span class="c1">##</span>
+    <span class="l l-Scalar l-Scalar-Plain">certfile</span><span class="p p-Indicator">:</span> <span class="s">&quot;/etc/ejabberd/ejabberd.pem&quot;</span>
+    <span class="l l-Scalar l-Scalar-Plain">starttls</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">true</span>
+    <span class="l l-Scalar l-Scalar-Plain">starttls_required</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">true</span>
+    <span class="c1">##</span>
+    <span class="c1">## Custom OpenSSL options</span>
+    <span class="c1">##</span>
+    <span class="l l-Scalar l-Scalar-Plain">protocol_options</span><span class="p p-Indicator">:</span>
+      <span class="p p-Indicator">-</span> <span class="s">&quot;no_sslv3&quot;</span>
+    <span class="c1">##   - &quot;no_tlsv1&quot;</span>
+    <span class="l l-Scalar l-Scalar-Plain">max_stanza_size</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">65536</span>
+    <span class="l l-Scalar l-Scalar-Plain">shaper</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">c2s_shaper</span>
+    <span class="l l-Scalar l-Scalar-Plain">access</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">c2s</span>
+</pre></div>
+
+
+<h3>Disable s2s service</h3>
+<p>And as I didn't need Server to Server services (s2s) in my use case, I disabled the s2s service in the <code>listen</code> section by commenting out the following lines:</p>
+<div class="highlight"><pre><span class="c1">#  -</span>
+<span class="c1">#    port: 5269</span>
+<span class="c1">#    ip: &quot;::&quot;</span>
+<span class="c1">#    module: ejabberd_s2s_in</span>
+</pre></div>
+
+
+<h3>Specify admin user</h3>
+<p>I then specified what the username of the main admin user, in that case <code>admin@chat.example.com</code> in the <code>acl</code> section of the configuration:</p>
+<div class="highlight"><pre><span class="l l-Scalar l-Scalar-Plain">acl</span><span class="p p-Indicator">:</span>
+  <span class="l l-Scalar l-Scalar-Plain">admin</span><span class="p p-Indicator">:</span>
+     <span class="l l-Scalar l-Scalar-Plain">user</span><span class="p p-Indicator">:</span>
+         <span class="p p-Indicator">-</span> <span class="s">&quot;admin&quot;</span><span class="p p-Indicator">:</span> <span class="s">&quot;chat.example.com&quot;</span>
+</pre></div>
+
+
+<h3>Disallow registrations</h3>
+<p>I prefer not to allow automatic registrations, and manually register people when needed - which in my use case won't be often. So I disabled automatic registration in the <code>access</code> section by changing:</p>
+<div class="highlight"><pre>  <span class="l l-Scalar l-Scalar-Plain">register</span><span class="p p-Indicator">:</span> 
+    <span class="l l-Scalar l-Scalar-Plain">all</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">allow</span>
+</pre></div>
+
+
+<p>to:</p>
+<div class="highlight"><pre>  <span class="l l-Scalar l-Scalar-Plain">register</span><span class="p p-Indicator">:</span> 
+    <span class="l l-Scalar l-Scalar-Plain">all</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">deny</span>
+</pre></div>
+
+
+<h3>Add mod_admin_extra</h3>
+<p>This module (included by default in more recent versions of ejabberd) adds useful extra administration commands available via <code>ejabberdctl</code>. To add this module, add <code>mod_admin_extra</code> to the <code>modules</code> section:</p>
+<div class="highlight"><pre><span class="l l-Scalar l-Scalar-Plain">modules</span><span class="p p-Indicator">:</span> 
+  <span class="l l-Scalar l-Scalar-Plain">mod_admin_extra</span><span class="p p-Indicator">:</span> <span class="p p-Indicator">{}</span>
+</pre></div>
+
+
+<p>And that's it for now - I will do more configuration changes later, but this is what is needed to get started.</p>
+<h3>Make MUC configuration explicit, and add moc_muc_admin</h3>
+<p>To connect to or create a MUC (Multi User Chatrooms) users must connect to <code>conference.chat.example.com</code>. This is the default configuration (and what most clients fill in by default), but I prefer to make it explict by uncomenting the line in the <code>modules</code> section. Also, while there, I add <code>mod_muc_admin</code> which adds some admin interface for MUCs - though note that all administration is possible from the client directly. So here is the relevant lines:</p>
+<div class="highlight"><pre>  <span class="l l-Scalar l-Scalar-Plain">mod_muc</span><span class="p p-Indicator">:</span>
+    <span class="l l-Scalar l-Scalar-Plain">host</span><span class="p p-Indicator">:</span> <span class="s">&quot;conference.@HOST@&quot;</span>
+    <span class="l l-Scalar l-Scalar-Plain">access</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">muc</span>
+    <span class="l l-Scalar l-Scalar-Plain">access_create</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">muc_create</span>
+    <span class="l l-Scalar l-Scalar-Plain">access_persistent</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">muc_create</span>
+    <span class="l l-Scalar l-Scalar-Plain">access_admin</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">muc_admin</span>
+  <span class="l l-Scalar l-Scalar-Plain">mod_muc_admin</span><span class="p p-Indicator">:</span> <span class="p p-Indicator">{}</span>
+</pre></div>
+
+
+<h2>Final steps, and first connection</h2>
+<p>So having intalled and configured the server, I then did the following steps:</p>
+<h3>Reload the configuration file</h3>
+<div class="highlight"><pre>    service ejabberd force-reload
+</pre></div>
+
+
+<h3>Create the admin user</h3>
+<div class="highlight"><pre>    ejabberdctl register admin chat.example.com sooosupersecretpassword
+</pre></div>
+
+
+<h3>Create a shared roster</h3>
+<p>This ensures that all your users can see each other without having to connect individually. Unfortunately this is not possible via the command line - you must use the web interface. The web interface by default runs on port <code>5280</code>. </p>
+<p>I tend to use <a href="https://en.wikipedia.org/wiki/Tunneling_protocol">ssh tunnel</a> to access this rather than open the port in my firewall (when invoking <code>ssh</code> pass the argument <code>-L5280:localhost:5280</code>, and you can then access the server's port 5280 as <code>localhost:5280</code>).</p>
+<p>So after either opening a tunnel or allowing traffic through the server's firewall, go to <code>localhost:5280/admin</code> in the first instance or <code>example.com:5280/admin</code> in the second, and navigate to <code>Virtual Hosts &gt; example.com &gt; Shared Roster Group</code>.</p>
+<p>Type in the <em>internal</em> name for the group containing everybody (I just call it <code>everybody</code> and while the admin interface lets you enter anything I believe this should not have spaces), and click on <code>Add new</code>.</p>
+<p>Then click on the group you just created and fill in the fields:</p>
+<ul>
+<li><strong>Name</strong>: The name of the group as displayed to users (I use "Everybody");</li>
+<li><strong>Description</strong>: This is not used anywhere, and just used for internal purpose;</li>
+<li><strong>Members</strong>: This is the list of members in the group. In this field you should enter <code>@all@</code> which represents all the users in the server;</li>
+<li><strong>Displayed Groups</strong>: This is a list of groups that is added to the roster of all members of this group. We simply include the group itself by adding here the <em>internal</em> name of the group. So in my case, as above, that's <code>everybody</code>.</li>
+</ul>
+<p>Click on Submit and you're done! Note that you can control shared roster groups using <code>ejabberdctl</code>, but it does not support the special value <code>@all@</code>.</p>
+<h3>Open firewall</h3>
+<p>And you need to open the firewall! Port <code>5222</code> is the main port.</p>
+<div class="highlight"><pre>    iptables -A INPUT -p tcp -m tcp --dport <span class="m">5222</span> -m conntrack --ctstate NEW,ESTABLISHED -j ACCEPT
+</pre></div>
+
+
+<p>Remember to make these changes permanent too, that will depend on how you configured your server (I use <a href="https://packages.debian.org/jessie/iptables-persistent">iptables-persistent</a>.</p>
+<h3>Test it!</h3>
+<p>Now is time to test, and debug any issues. Start a Jabber/XMPP client, point it to your server, and try connecting with your admin user. If it doesn't work, the logs are helpful and in <code>/var/log/ejabberd</code> on the server.</p>
+<p>Once you manage to connect, I'd recomend setting up a second user to test with. And make sure you can't register new accounts (unless you want to allow people to do that!)</p>
+            </div>
+        </div>
+    </div>
+        </div>
+
+        <div id="footer">
+            <p>Alice online: <a href="http://github.com/aliceh75">GitHub</a> <a href="https://twitter.com/aliceheaton75">Twitter</a></p>
+            <p>Site generated by <a href="http://pelican.readthedocs.org">Pelican</a>, theme loosely based on <a href="https://github.com/tbunnyman/pelican-chunk">Chunk</a></p>
+            <p>All content by Alice Heaton, licensed under a <a rel="license" href="http://creativecommons.org/licenses/by-sa/4.0/">Creative Commons Attribution-ShareAlike 4.0 International License</a>
+               <a rel="license" href="http://creativecommons.org/licenses/by-sa/4.0/"><img alt="Creative Commons Licence" style="border-width:0" src="http://i.creativecommons.org/l/by-sa/4.0/80x15.png" /></a>
+            </p>
+        </div>
+    </div>
+</body>
+</html>
