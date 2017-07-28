@@ -1,7 +1,7 @@
 Title: Re-implementing the CKAN API for performance
 Date: 2015-04-28
 Slug: reimplementing-ckan-api-for-performance
-Tags: ckan python
+Tags: ckan, python
 Summary: [CKAN](http://ckan.org), an open source data portal platform, provides an API for fetching everything from datasets to individual records. Here we look at how CKAN's architecture allows developers to transparently re-implement the datastore API, and how this was used to improve performance by switching all searches to using a [Solr](https://lucene.apache.org/solr/) backend.
 
 [CKAN](http://ckan.org), an open source data portal platform, provides an API for fetching everything from datasets to individual records (using the [Datastore extension](http://docs.ckan.org/en/latest/maintaining/datastore.html)). Here we look at how CKAN's architecture allows developers to transparently re-implement the datastore API, and how this was used to improve performance by switching all searches to using a [Solr](https://lucene.apache.org/solr/) backend.
