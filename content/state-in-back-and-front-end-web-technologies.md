@@ -1,7 +1,7 @@
 Title: State in back and front end web technologies
 Date: 2017-03-16
 Slugs: state-in-back-and-front-end-web-technologies
-Tags: web, state, workflow 
+Tags: architecture
 Summary: Processing user requests in the backend component of websites is something that feels like a mostly solved problem. Doing the same in frontend web applications is on the other hand something that is still being improved on all the time. Here I look at how managing state differs in the two environment, and how this affects application architecture.
 
 Processing user requests in the backend component of websites is something that feels like a mostly solved problem. Doing the same in frontend web applications is on the other hand something that is still being improved on all the time. Here I look at how managing [state](https://en.wikipedia.org/wiki/State_(computer_science)) differs in the two environment, and how this affects application architecture.
