@@ -91,8 +91,8 @@ def create_temp_self_signed_cert():
     cert.get_subject().C = "UK"
     cert.get_subject().ST = "London"
     cert.get_subject().L = "London"
-    cert.get_subject().O = "aioimaplib"
-    cert.get_subject().OU = "aioimaplib"
+    cert.get_subject().O = "myapp"
+    cert.get_subject().OU = "myapp"
     cert.get_subject().CN = 'localhost'
     cert.set_serial_number(1000)
     cert.gmtime_adj_notBefore(0)
