@@ -1,6 +1,6 @@
 AUTHOR = u'Alice Heaton'
 SITENAME = u'Alice/Development Notes'
-SITEURL = 'http://aliceh75.github.io'
+SITEURL = 'https://aliceh75.github.io'
 
 TIMEZONE = 'Europe/London'
 
