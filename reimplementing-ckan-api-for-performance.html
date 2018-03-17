@@ -3,13 +3,13 @@
 <head>
     <title>Alice/Development Notes &mdash; Re-implementing the CKAN API for performance</title>
     <meta charset="utf-8"/>
-    <link rel="stylesheet" type="text/css" href="http://aliceh75.github.io/theme/css/style.css"/>
+    <link rel="stylesheet" type="text/css" href="https://aliceh75.github.io/theme/css/style.css"/>
 </head>
 
 <body>
     <div id="container">
         <div id="header">
-                <div id="site-title"><a href="http://aliceh75.github.io">Alice/Development Notes</a></div>
+                <div id="site-title"><a href="https://aliceh75.github.io">Alice/Development Notes</a></div>
         </div>
 
         <div id="contents">
@@ -18,13 +18,13 @@
             <div class="date">Tue 28 April 2015</div>
             <div class="author">By Alice Heaton</div>
                 <div class="tag-list">
-                        <a href="http://aliceh75.github.io/tag/ckan" rel="tag">#ckan</a>
-                        <a href="http://aliceh75.github.io/tag/python" rel="tag">#python</a>
+                        <a href="https://aliceh75.github.io/tag/ckan" rel="tag">#ckan</a>
+                        <a href="https://aliceh75.github.io/tag/python" rel="tag">#python</a>
                 </div>
         </div>
         <div class="entry-main">
             <h1 class="entry-title">
-                <a href="http://aliceh75.github.io/reimplementing-ckan-api-for-performance" title="Re-implementing the CKAN API for performance"
+                <a href="https://aliceh75.github.io/reimplementing-ckan-api-for-performance" title="Re-implementing the CKAN API for performance"
                    rel="bookmark">Re-implementing the CKAN API for performance</a>
             </h1>
             <div class="entry-content">
@@ -50,28 +50,28 @@
 
     <span class="k">def</span> <span class="nf">before_map</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="nb">map</span><span class="p">):</span> 
         <span class="nb">map</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span>
-            <span class="s1">&#39;datasolr&#39;</span><span class="p">,</span>
-            <span class="s1">&#39;/api/3/action/datastore_search&#39;</span><span class="p">,</span>
-            <span class="n">controller</span><span class="o">=</span><span class="s1">&#39;api&#39;</span><span class="p">,</span>
-            <span class="n">action</span><span class="o">=</span><span class="s1">&#39;action&#39;</span><span class="p">,</span>
-            <span class="n">logic_function</span><span class="o">=</span><span class="s1">&#39;datastore_solr_search&#39;</span><span class="p">,</span>
-            <span class="n">ver</span><span class="o">=</span><span class="s1">u&#39;/3&#39;</span>
+            <span class="s">&#39;datasolr&#39;</span><span class="p">,</span>
+            <span class="s">&#39;/api/3/action/datastore_search&#39;</span><span class="p">,</span>
+            <span class="n">controller</span><span class="o">=</span><span class="s">&#39;api&#39;</span><span class="p">,</span>
+            <span class="n">action</span><span class="o">=</span><span class="s">&#39;action&#39;</span><span class="p">,</span>
+            <span class="n">logic_function</span><span class="o">=</span><span class="s">&#39;datastore_solr_search&#39;</span><span class="p">,</span>
+            <span class="n">ver</span><span class="o">=</span><span class="s">u&#39;/3&#39;</span>
         <span class="p">)</span>
 </pre></div>
 
 
 <p>We need to declare our logic function <code>datastore_solr_search</code> by implementing the <a href="http://docs.ckan.org/en/latest/extensions/plugin-interfaces.html#ckan.plugins.interfaces.IActions">IActions</a> interface in our plugin:</p>
-<div class="highlight"><pre><span class="c1"># ...</span>
+<div class="highlight"><pre><span class="c"># ...</span>
 <span class="kn">from</span> <span class="nn">ckanext.datasolr.logic.action</span> <span class="kn">import</span> <span class="n">datastore_solr_search</span>
 
 <span class="k">class</span> <span class="nc">DataSolrPlugin</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">SingletonPlugin</span><span class="p">):</span>
-    <span class="c1"># ...</span>
+    <span class="c"># ...</span>
     <span class="n">p</span><span class="o">.</span><span class="n">implements</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">interfaces</span><span class="o">.</span><span class="n">IActions</span><span class="p">)</span>
 
-    <span class="c1"># ...</span>
+    <span class="c"># ...</span>
     <span class="k">def</span> <span class="nf">get_actions</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="p">{</span>
-            <span class="s1">&#39;datastore_solr_search&#39;</span><span class="p">:</span> <span class="n">datastore_solr_search</span>
+            <span class="s">&#39;datastore_solr_search&#39;</span><span class="p">:</span> <span class="n">datastore_solr_search</span>
         <span class="p">}</span>
 </pre></div>
 

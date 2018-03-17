@@ -3,13 +3,13 @@
 <head>
     <title>Alice/Development Notes &mdash; Setting up a Cordova development environment in Ubuntu</title>
     <meta charset="utf-8"/>
-    <link rel="stylesheet" type="text/css" href="http://aliceh75.github.io/theme/css/style.css"/>
+    <link rel="stylesheet" type="text/css" href="https://aliceh75.github.io/theme/css/style.css"/>
 </head>
 
 <body>
     <div id="container">
         <div id="header">
-                <div id="site-title"><a href="http://aliceh75.github.io">Alice/Development Notes</a></div>
+                <div id="site-title"><a href="https://aliceh75.github.io">Alice/Development Notes</a></div>
         </div>
 
         <div id="contents">
@@ -18,13 +18,13 @@
             <div class="date">Tue 03 November 2015</div>
             <div class="author">By Alice Heaton</div>
                 <div class="tag-list">
-                        <a href="http://aliceh75.github.io/tag/android" rel="tag">#android</a>
-                        <a href="http://aliceh75.github.io/tag/cordova" rel="tag">#cordova</a>
+                        <a href="https://aliceh75.github.io/tag/android" rel="tag">#android</a>
+                        <a href="https://aliceh75.github.io/tag/cordova" rel="tag">#cordova</a>
                 </div>
         </div>
         <div class="entry-main">
             <h1 class="entry-title">
-                <a href="http://aliceh75.github.io/setting-up-cordova-dev-environmnent-in-ubuntu" title="Setting up a Cordova development environment in Ubuntu"
+                <a href="https://aliceh75.github.io/setting-up-cordova-dev-environmnent-in-ubuntu" title="Setting up a Cordova development environment in Ubuntu"
                    rel="bookmark">Setting up a Cordova development environment in Ubuntu</a>
             </h1>
             <div class="entry-content">
@@ -47,7 +47,7 @@ sudo chmod ugo+x /usr/local/android-sdk-linux/tools/android
 
 <p>By default this will install the latest version of the tools, and the latest version of the Android APIs (You'll need to accept a number of licences). If you want to develop for older versions of Android, make sure to select the APIs accordingly.</p>
 <p>You will need the <code>tools</code> and <code>platform-tools</code> folders in your path. I add this to my <code>~/.bashrc</code>:</p>
-<div class="highlight"><pre><span class="nv">PATH</span><span class="o">=</span><span class="s2">&quot;</span>$<span class="s2">PATH:/usr/local/android-sdk-linux/tools:/usr/local/android-sdk-linux/platform-tools&quot;</span>
+<div class="highlight"><pre><span class="nv">PATH</span><span class="o">=</span><span class="s2">&quot;</span><span class="nv">$PATH</span><span class="s2">:/usr/local/android-sdk-linux/tools:/usr/local/android-sdk-linux/platform-tools&quot;</span>
 </pre></div>
 
 
@@ -113,7 +113,7 @@ cordova platform add android
 
 
 <p>If you forgot to start it, you must stop it and re-start it:</p>
-<div class="highlight"><pre>sudo adb kill-server
+<div class="highlight"><pre>sudo adb <span class="nb">kill</span>-server
 sudo adb start-server
 </pre></div>
 

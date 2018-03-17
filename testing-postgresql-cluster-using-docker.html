@@ -3,13 +3,13 @@
 <head>
     <title>Alice/Development Notes &mdash; Testing a PostgreSQL slave/master cluster using Docker</title>
     <meta charset="utf-8"/>
-    <link rel="stylesheet" type="text/css" href="http://aliceh75.github.io/theme/css/style.css"/>
+    <link rel="stylesheet" type="text/css" href="https://aliceh75.github.io/theme/css/style.css"/>
 </head>
 
 <body>
     <div id="container">
         <div id="header">
-                <div id="site-title"><a href="http://aliceh75.github.io">Alice/Development Notes</a></div>
+                <div id="site-title"><a href="https://aliceh75.github.io">Alice/Development Notes</a></div>
         </div>
 
         <div id="contents">
@@ -18,14 +18,14 @@
             <div class="date">Mon 12 January 2015</div>
             <div class="author">By Alice Heaton</div>
                 <div class="tag-list">
-                        <a href="http://aliceh75.github.io/tag/docker" rel="tag">#docker</a>
-                        <a href="http://aliceh75.github.io/tag/postgresql" rel="tag">#postgresql</a>
-                        <a href="http://aliceh75.github.io/tag/python" rel="tag">#python</a>
+                        <a href="https://aliceh75.github.io/tag/docker" rel="tag">#docker</a>
+                        <a href="https://aliceh75.github.io/tag/postgresql" rel="tag">#postgresql</a>
+                        <a href="https://aliceh75.github.io/tag/python" rel="tag">#python</a>
                 </div>
         </div>
         <div class="entry-main">
             <h1 class="entry-title">
-                <a href="http://aliceh75.github.io/testing-postgresql-cluster-using-docker" title="Testing a PostgreSQL slave/master cluster using Docker"
+                <a href="https://aliceh75.github.io/testing-postgresql-cluster-using-docker" title="Testing a PostgreSQL slave/master cluster using Docker"
                    rel="bookmark">Testing a PostgreSQL slave/master cluster using Docker</a>
             </h1>
             <div class="entry-content">
@@ -112,10 +112,10 @@ CMD /var/lib/postgresql/9.1/run.sh
 
 
 <p>The script <code>run.sh</code> performs the initial database copy, and then starts the server:</p>
-<div class="highlight"><pre><span class="ch">#!/bin/sh</span>
-<span class="c1">#</span>
-<span class="c1"># Snapshot the initial database</span>
-<span class="c1">#</span>
+<div class="highlight"><pre><span class="c">#!/bin/sh</span>
+<span class="c">#</span>
+<span class="c"># Snapshot the initial database</span>
+<span class="c">#</span>
 /usr/bin/pg_basebackup -h pg_master -p <span class="m">5432</span> -D /var/lib/postgresql/9.1/main2 -U postgres -v -P -x
 cp /var/lib/postgresql/9.1/main/recovery.conf /var/lib/postgresql/9.1/main2
 cp /var/lib/postgresql/9.1/main/server.* /var/lib/postgresql/9.1/main2
@@ -123,9 +123,9 @@ rm -Rf /var/lib/postgresql/9.1/main
 mv /var/lib/postgresql/9.1/main2 /var/lib/postgresql/9.1/main
 chown -R postgres:postgres /var/lib/postgresql/9.1/main
 
-<span class="c1">#</span>
-<span class="c1"># Start the postgresql server</span>
-<span class="c1">#</span>
+<span class="c">#</span>
+<span class="c"># Start the postgresql server</span>
+<span class="c">#</span>
 /usr/lib/postgresql/9.1/bin/postgres -D /var/lib/postgresql/9.1/main -c <span class="nv">config_file</span><span class="o">=</span>/etc/postgresql/9.1/main/postgresql.conf
 </pre></div>
 
@@ -141,10 +141,10 @@ chown -R postgres:postgres /var/lib/postgresql/9.1/main
 <span class="kn">import</span> <span class="nn">docker</span>
 
 <span class="n">slave_count</span> <span class="o">=</span> <span class="mi">2</span>
-<span class="n">docker_url</span> <span class="o">=</span> <span class="s1">&#39;unix://var/run/docker.sock&#39;</span>
-<span class="n">docker_api_version</span> <span class="o">=</span> <span class="s1">&#39;1.14&#39;</span>
-<span class="n">master_image_path</span> <span class="o">=</span> <span class="s1">&#39;/path/to/folder/containing/master/dockerfile&#39;</span>
-<span class="n">slave_image_path</span> <span class="o">=</span> <span class="s1">&#39;/path/to/folder/containing/slave/dockerfile&#39;</span>
+<span class="n">docker_url</span> <span class="o">=</span> <span class="s">&#39;unix://var/run/docker.sock&#39;</span>
+<span class="n">docker_api_version</span> <span class="o">=</span> <span class="s">&#39;1.14&#39;</span>
+<span class="n">master_image_path</span> <span class="o">=</span> <span class="s">&#39;/path/to/folder/containing/master/dockerfile&#39;</span>
+<span class="n">slave_image_path</span> <span class="o">=</span> <span class="s">&#39;/path/to/folder/containing/slave/dockerfile&#39;</span>
 
 <span class="n">master</span> <span class="o">=</span> <span class="bp">None</span>
 <span class="n">slaves</span> <span class="o">=</span> <span class="p">[]</span>
@@ -154,61 +154,61 @@ chown -R postgres:postgres /var/lib/postgresql/9.1/main
     <span class="n">stream</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">build</span><span class="p">(</span><span class="n">path</span><span class="o">=</span><span class="n">path</span><span class="p">,</span> <span class="n">tag</span><span class="o">=</span><span class="n">tag</span><span class="p">)</span>
     <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">stream</span><span class="p">:</span>
         <span class="n">info</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">line</span><span class="p">)</span>
-        <span class="k">if</span> <span class="s1">&#39;error&#39;</span> <span class="ow">in</span> <span class="n">info</span><span class="p">:</span>
+        <span class="k">if</span> <span class="s">&#39;error&#39;</span> <span class="ow">in</span> <span class="n">info</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="n">line</span><span class="p">)</span>
 
 
-<span class="c1"># Create Docker client</span>
+<span class="c"># Create Docker client</span>
 <span class="n">client</span> <span class="o">=</span> <span class="n">docker</span><span class="o">.</span><span class="n">Client</span><span class="p">(</span><span class="n">base_url</span><span class="o">=</span><span class="n">docker_url</span><span class="p">,</span> <span class="n">version</span><span class="o">=</span><span class="n">docker_api_version</span><span class="p">)</span>
 
-<span class="c1"># Build images</span>
-<span class="n">build_image</span><span class="p">(</span><span class="n">client</span><span class="p">,</span> <span class="n">master_image_path</span><span class="p">,</span> <span class="s1">&#39;test_master&#39;</span><span class="p">)</span>
-<span class="n">build_image</span><span class="p">(</span><span class="n">client</span><span class="p">,</span> <span class="n">slave_image_path</span><span class="p">,</span> <span class="s1">&#39;test_slave&#39;</span><span class="p">)</span>
+<span class="c"># Build images</span>
+<span class="n">build_image</span><span class="p">(</span><span class="n">client</span><span class="p">,</span> <span class="n">master_image_path</span><span class="p">,</span> <span class="s">&#39;test_master&#39;</span><span class="p">)</span>
+<span class="n">build_image</span><span class="p">(</span><span class="n">client</span><span class="p">,</span> <span class="n">slave_image_path</span><span class="p">,</span> <span class="s">&#39;test_slave&#39;</span><span class="p">)</span>
 
-<span class="c1"># Create master container and start it</span>
+<span class="c"># Create master container and start it</span>
 <span class="n">master</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">create_container</span><span class="p">(</span>
-    <span class="n">image</span><span class="o">=</span><span class="s1">&#39;test_master&#39;</span><span class="p">,</span>
+    <span class="n">image</span><span class="o">=</span><span class="s">&#39;test_master&#39;</span><span class="p">,</span>
     <span class="n">detach</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span>
     <span class="n">ports</span><span class="o">=</span><span class="p">[</span><span class="mi">5432</span><span class="p">],</span>
-    <span class="n">name</span><span class="o">=</span><span class="s1">&#39;test_master&#39;</span>
+    <span class="n">name</span><span class="o">=</span><span class="s">&#39;test_master&#39;</span>
 <span class="p">)</span>
 <span class="n">client</span><span class="o">.</span><span class="n">start_container</span><span class="p">(</span>
-    <span class="n">container</span><span class="o">=</span><span class="n">master</span><span class="p">[</span><span class="s1">&#39;Id&#39;</span><span class="p">],</span>
+    <span class="n">container</span><span class="o">=</span><span class="n">master</span><span class="p">[</span><span class="s">&#39;Id&#39;</span><span class="p">],</span>
     <span class="n">port_bindings</span><span class="o">=</span><span class="p">{</span><span class="mi">5432</span><span class="p">:</span><span class="mi">5432</span><span class="p">},</span>
 <span class="p">)</span>
 
-<span class="c1"># Ensure the master is ready to be replicated</span>
+<span class="c"># Ensure the master is ready to be replicated</span>
 <span class="n">times</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
 
-<span class="c1"># Create slaves and start them</span>
+<span class="c"># Create slaves and start them</span>
 <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">slave_count</span><span class="p">):</span>
     <span class="n">slaves</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">create_container</span><span class="p">(</span>
-        <span class="n">image</span><span class="o">=</span><span class="s1">&#39;test_slave&#39;</span><span class="p">,</span>
+        <span class="n">image</span><span class="o">=</span><span class="s">&#39;test_slave&#39;</span><span class="p">,</span>
         <span class="n">detach</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span>
         <span class="n">ports</span><span class="o">=</span><span class="p">[</span><span class="mi">5432</span><span class="p">],</span>
-        <span class="n">name</span><span class="o">=</span><span class="s1">&#39;test_slave_{}&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
+        <span class="n">name</span><span class="o">=</span><span class="s">&#39;test_slave_{}&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
     <span class="p">)</span>
     <span class="n">client</span><span class="o">.</span><span class="n">start_container</span><span class="p">(</span>
-        <span class="n">container</span><span class="o">=</span><span class="n">slaves</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="s1">&#39;Id&#39;</span><span class="p">],</span>
+        <span class="n">container</span><span class="o">=</span><span class="n">slaves</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="s">&#39;Id&#39;</span><span class="p">],</span>
         <span class="n">port_bindings</span><span class="o">=</span><span class="p">{</span><span class="mi">5432</span><span class="p">:</span> <span class="mi">5433</span> <span class="o">+</span> <span class="n">i</span><span class="p">},</span>
-        <span class="n">links</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;test_master&#39;</span><span class="p">:</span> <span class="s1">&#39;pg_master&#39;</span><span class="p">}</span>
+        <span class="n">links</span><span class="o">=</span><span class="p">{</span><span class="s">&#39;test_master&#39;</span><span class="p">:</span> <span class="s">&#39;pg_master&#39;</span><span class="p">}</span>
     <span class="p">)</span>
 
-<span class="c1"># Now do some tests...</span>
+<span class="c"># Now do some tests...</span>
 <span class="n">my_tests_with_servers_up</span><span class="p">()</span>
 
-<span class="c1"># Bring master down temporarily, test again.</span>
-<span class="n">client</span><span class="o">.</span><span class="n">pause_container</span><span class="p">(</span><span class="n">container</span><span class="o">=</span><span class="n">master</span><span class="p">[</span><span class="s1">&#39;Id&#39;</span><span class="p">])</span>
+<span class="c"># Bring master down temporarily, test again.</span>
+<span class="n">client</span><span class="o">.</span><span class="n">pause_container</span><span class="p">(</span><span class="n">container</span><span class="o">=</span><span class="n">master</span><span class="p">[</span><span class="s">&#39;Id&#39;</span><span class="p">])</span>
 <span class="n">my_tests_with_master_down</span><span class="p">()</span>
 
-<span class="c1"># Bring master back up, test again.</span>
-<span class="n">client</span><span class="o">.</span><span class="n">unpause_container</span><span class="p">(</span><span class="n">container</span><span class="o">=</span><span class="n">master</span><span class="p">[</span><span class="s1">&#39;Id&#39;</span><span class="p">])</span>
+<span class="c"># Bring master back up, test again.</span>
+<span class="n">client</span><span class="o">.</span><span class="n">unpause_container</span><span class="p">(</span><span class="n">container</span><span class="o">=</span><span class="n">master</span><span class="p">[</span><span class="s">&#39;Id&#39;</span><span class="p">])</span>
 <span class="n">my_tests_with_master_back</span><span class="p">()</span>
 
-<span class="c1"># Stop and delete all containers</span>
-<span class="n">client</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">container</span><span class="o">=</span><span class="n">master</span><span class="p">[</span><span class="s1">&#39;Id&#39;</span><span class="p">],</span> <span class="n">force</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+<span class="c"># Stop and delete all containers</span>
+<span class="n">client</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">container</span><span class="o">=</span><span class="n">master</span><span class="p">[</span><span class="s">&#39;Id&#39;</span><span class="p">],</span> <span class="n">force</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
 <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">slave_count</span><span class="p">):</span>
-    <span class="n">client</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">container</span><span class="o">=</span><span class="n">slaves</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="s1">&#39;Id&#39;</span><span class="p">],</span> <span class="n">force</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+    <span class="n">client</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">container</span><span class="o">=</span><span class="n">slaves</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="s">&#39;Id&#39;</span><span class="p">],</span> <span class="n">force</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
 </pre></div>
             </div>
         </div>

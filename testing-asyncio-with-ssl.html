@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Alice/Development Notes &mdash; Testing Python asyncio code with SSL</title>
+    <meta charset="utf-8"/>
+    <link rel="stylesheet" type="text/css" href="https://aliceh75.github.io/theme/css/style.css"/>
+</head>
+
+<body>
+    <div id="container">
+        <div id="header">
+                <div id="site-title"><a href="https://aliceh75.github.io">Alice/Development Notes</a></div>
+        </div>
+
+        <div id="contents">
+    <div class="post">
+        <div class="entry-meta">
+            <div class="date">Thu 01 March 2018</div>
+            <div class="author">By Alice Heaton</div>
+                <div class="tag-list">
+                        <a href="https://aliceh75.github.io/tag/asyncio" rel="tag">#asyncio</a>
+                        <a href="https://aliceh75.github.io/tag/python" rel="tag">#python</a>
+                </div>
+        </div>
+        <div class="entry-main">
+            <h1 class="entry-title">
+                <a href="https://aliceh75.github.io/testing-asyncio-with-ssl" title="Testing Python asyncio code with SSL"
+                   rel="bookmark">Testing Python asyncio code with SSL</a>
+            </h1>
+            <div class="entry-content">
+                  <p>The <a href="https://docs.python.org/3/library/asyncio.html">asyncio</a> library introduced in Python 3.4 allows us to write concurrent code running, amongst other things, network clients and servers. Here I show how to unit-test asyncio code to ensure it is possible to use it over an SSL connection. </p>
+<p>The first thing to note is that asyncio handles SSL transparently - so unit tests only need to ensure the SSL connection can happen, they don't need to repeat all the tests over SSL. Also note I'm using the <a href="https://docs.python.org/3/library/asyncio-task.html">async/await</a> syntax introduced in Python 3.5.</p>
+<p>So let's assume we have a client library with the following code (this example merely sends a line of data, reads one line of reply and returns it):</p>
+<div class="highlight"><pre><span class="kn">import</span> <span class="nn">asyncio</span>
+<span class="kn">import</span> <span class="nn">re</span>
+
+<span class="k">class</span> <span class="nc">DataFetcher</span><span class="p">():</span>
+      <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">host</span><span class="p">,</span> <span class="n">port</span><span class="p">,</span> <span class="n">ssl_context</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+          <span class="bp">self</span><span class="o">.</span><span class="n">host</span> <span class="o">=</span> <span class="n">host</span>
+          <span class="bp">self</span><span class="o">.</span><span class="n">port</span> <span class="o">=</span> <span class="n">port</span>
+          <span class="bp">self</span><span class="o">.</span><span class="n">ssl_context</span> <span class="o">=</span> <span class="n">ssl_context</span>
+
+      <span class="n">async</span> <span class="k">def</span> <span class="nf">get_the_data</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">the_question</span><span class="p">):</span>
+          <span class="n">reader</span><span class="p">,</span> <span class="n">writer</span> <span class="o">=</span> <span class="n">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">open_connection</span><span class="p">(</span>
+              <span class="bp">self</span><span class="o">.</span><span class="n">host</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">port</span><span class="p">,</span> <span class="n">ssl</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">ssl_context</span>
+          <span class="p">)</span>
+          <span class="n">writer</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">the_question</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s">&#39;utf-8&#39;</span><span class="p">)</span> <span class="o">+</span> <span class="n">b</span><span class="s">&quot;</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">)</span>
+          <span class="n">await</span> <span class="n">writer</span><span class="o">.</span><span class="n">drain</span><span class="p">()</span>
+
+          <span class="n">data</span> <span class="o">=</span> <span class="n">await</span> <span class="n">reader</span><span class="o">.</span><span class="n">readline</span><span class="p">()</span>
+          <span class="n">writer</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+          <span class="k">return</span> <span class="nb">str</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="s">&#39;utf-8&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+</pre></div>
+
+
+<p>As you can see the client library allows for an optional <code>ssl_context</code>, which should be an instance of <a href="https://docs.python.org/3/library/ssl.html#ssl.SSLContext">ssl.SSLContext</a> typically created using <a href="https://docs.python.org/3/library/ssl.html#ssl.create_default_context">ssl.create_default_context</a>.</p>
+<p>Now let's assume that, for the purpose of unit testing, you've created a mock server that implements enough of the protocol you're working with for your purpose (in this instance, our server is an echo server which upcases it's input):</p>
+<div class="highlight"><pre><span class="kn">import</span> <span class="nn">asyncio</span>
+
+<span class="k">class</span> <span class="nc">MockDataServer</span><span class="p">():</span>
+      <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">host</span><span class="p">,</span> <span class="n">port</span><span class="p">,</span> <span class="n">ssl_context</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+          <span class="bp">self</span><span class="o">.</span><span class="n">host</span> <span class="o">=</span> <span class="n">host</span>
+          <span class="bp">self</span><span class="o">.</span><span class="n">port</span> <span class="o">=</span> <span class="n">port</span>
+          <span class="bp">self</span><span class="o">.</span><span class="n">ssl_context</span> <span class="o">=</span> <span class="n">ssl_context</span>
+
+      <span class="k">def</span> <span class="nf">start</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+          <span class="k">return</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">start_server</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">handle_connection</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">host</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">port</span><span class="p">,</span> <span class="n">ssl</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">ssl_context</span><span class="p">)</span>
+
+      <span class="n">async</span> <span class="k">def</span> <span class="nf">handle_connection</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">reader</span><span class="p">,</span> <span class="n">writer</span><span class="p">):</span>
+          <span class="n">data</span> <span class="o">=</span> <span class="n">await</span> <span class="n">reader</span><span class="o">.</span><span class="n">readline</span><span class="p">()</span>
+          <span class="n">data</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="s">&#39;utf-8&#39;</span><span class="p">)</span>
+          <span class="n">writer</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s">&#39;utf-8&#39;</span><span class="p">)</span> <span class="o">+</span> <span class="n">b</span><span class="s">&quot;</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">)</span>
+          <span class="n">await</span> <span class="n">writer</span><span class="o">.</span><span class="n">drain</span><span class="p">()</span>
+          <span class="n">writer</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+</pre></div>
+
+
+<p>Similarly this takes an optional <code>ssl_context</code>. Note that as this is a server component the ssl context would need to be created with a valid certificate. There are multiple ways to do this:</p>
+<ol>
+<li>Include a self-signed certificate in your test suites;</li>
+<li>Generate a self-signed certificate while running the tests using command line tools such as <a href="https://www.openssl.org/">OpenSSL</a>;</li>
+<li>Generate a self-signed certificate while running the tests using the <a href="https://pyopenssl.org/en/stable/">pyOpenSSL python library</a>;</li>
+</ol>
+<p>The first option works (you can set an expiry year of 9999 in your certificate), though limits your test's ability to customise the certificate; the second option requires the test host to have the OpenSSL command line tool installed, and has the risk of that tool's parameters changing. So here I will look at the third option.</p>
+<p>The following code uses <a href="https://pyopenssl.org/en/stable/">pyOpenSSL</a> to generate a self signed certificate in a temporary file, returning both the certificate and the key file (please feel free to re-use this code in your own projects):</p>
+<div class="highlight"><pre><span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">tempfile</span>
+
+<span class="kn">from</span> <span class="nn">OpenSSL</span> <span class="kn">import</span> <span class="n">crypto</span>
+
+
+<span class="k">def</span> <span class="nf">create_temp_self_signed_cert</span><span class="p">():</span>
+    <span class="sd">&quot;&quot;&quot; Create a self signed SSL certificate in temporary files for host</span>
+<span class="sd">        &#39;localhost&#39;</span>
+
+<span class="sd">    Returns a tuple containing the certificate file name and the key</span>
+<span class="sd">    file name.</span>
+
+<span class="sd">    It is the caller&#39;s responsibility to delete the files after use</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c"># create a key pair</span>
+    <span class="n">key</span> <span class="o">=</span> <span class="n">crypto</span><span class="o">.</span><span class="n">PKey</span><span class="p">()</span>
+    <span class="n">key</span><span class="o">.</span><span class="n">generate_key</span><span class="p">(</span><span class="n">crypto</span><span class="o">.</span><span class="n">TYPE_RSA</span><span class="p">,</span> <span class="mi">1024</span><span class="p">)</span>
+
+    <span class="c"># create a self-signed cert</span>
+    <span class="n">cert</span> <span class="o">=</span> <span class="n">crypto</span><span class="o">.</span><span class="n">X509</span><span class="p">()</span>
+    <span class="n">cert</span><span class="o">.</span><span class="n">get_subject</span><span class="p">()</span><span class="o">.</span><span class="n">C</span> <span class="o">=</span> <span class="s">&quot;UK&quot;</span>
+    <span class="n">cert</span><span class="o">.</span><span class="n">get_subject</span><span class="p">()</span><span class="o">.</span><span class="n">ST</span> <span class="o">=</span> <span class="s">&quot;London&quot;</span>
+    <span class="n">cert</span><span class="o">.</span><span class="n">get_subject</span><span class="p">()</span><span class="o">.</span><span class="n">L</span> <span class="o">=</span> <span class="s">&quot;London&quot;</span>
+    <span class="n">cert</span><span class="o">.</span><span class="n">get_subject</span><span class="p">()</span><span class="o">.</span><span class="n">O</span> <span class="o">=</span> <span class="s">&quot;aioimaplib&quot;</span>
+    <span class="n">cert</span><span class="o">.</span><span class="n">get_subject</span><span class="p">()</span><span class="o">.</span><span class="n">OU</span> <span class="o">=</span> <span class="s">&quot;aioimaplib&quot;</span>
+    <span class="n">cert</span><span class="o">.</span><span class="n">get_subject</span><span class="p">()</span><span class="o">.</span><span class="n">CN</span> <span class="o">=</span> <span class="s">&#39;localhost&#39;</span>
+    <span class="n">cert</span><span class="o">.</span><span class="n">set_serial_number</span><span class="p">(</span><span class="mi">1000</span><span class="p">)</span>
+    <span class="n">cert</span><span class="o">.</span><span class="n">gmtime_adj_notBefore</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+    <span class="n">cert</span><span class="o">.</span><span class="n">gmtime_adj_notAfter</span><span class="p">(</span><span class="mi">10</span> <span class="o">*</span> <span class="mi">365</span> <span class="o">*</span> <span class="mi">24</span> <span class="o">*</span> <span class="mi">60</span> <span class="o">*</span> <span class="mi">60</span><span class="p">)</span>
+    <span class="n">cert</span><span class="o">.</span><span class="n">set_issuer</span><span class="p">(</span><span class="n">cert</span><span class="o">.</span><span class="n">get_subject</span><span class="p">())</span>
+    <span class="n">cert</span><span class="o">.</span><span class="n">set_pubkey</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+    <span class="n">cert</span><span class="o">.</span><span class="n">sign</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="s">&#39;sha1&#39;</span><span class="p">)</span>
+
+    <span class="c"># Save certificate in temporary file</span>
+    <span class="p">(</span><span class="n">cert_file_fd</span><span class="p">,</span> <span class="n">cert_file_name</span><span class="p">)</span> <span class="o">=</span> <span class="n">tempfile</span><span class="o">.</span><span class="n">mkstemp</span><span class="p">(</span><span class="n">suffix</span><span class="o">=</span><span class="s">&#39;.crt&#39;</span><span class="p">,</span> <span class="n">prefix</span><span class="o">=</span><span class="s">&#39;cert&#39;</span><span class="p">)</span>
+    <span class="n">cert_file</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">fdopen</span><span class="p">(</span><span class="n">cert_file_fd</span><span class="p">,</span> <span class="s">&#39;wb&#39;</span><span class="p">)</span>
+    <span class="n">cert_file</span><span class="o">.</span><span class="n">write</span><span class="p">(</span>
+        <span class="n">crypto</span><span class="o">.</span><span class="n">dump_certificate</span><span class="p">(</span><span class="n">crypto</span><span class="o">.</span><span class="n">FILETYPE_PEM</span><span class="p">,</span> <span class="n">cert</span><span class="p">)</span>
+    <span class="p">)</span>
+    <span class="n">cert_file</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+
+    <span class="c"># Save key in temporary file</span>
+    <span class="p">(</span><span class="n">key_file_fd</span><span class="p">,</span> <span class="n">key_file_name</span><span class="p">)</span> <span class="o">=</span> <span class="n">tempfile</span><span class="o">.</span><span class="n">mkstemp</span><span class="p">(</span><span class="n">suffix</span><span class="o">=</span><span class="s">&#39;.key&#39;</span><span class="p">,</span> <span class="n">prefix</span><span class="o">=</span><span class="s">&#39;cert&#39;</span><span class="p">)</span>
+    <span class="n">key_file</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">fdopen</span><span class="p">(</span><span class="n">key_file_fd</span><span class="p">,</span> <span class="s">&#39;wb&#39;</span><span class="p">)</span>
+    <span class="n">key_file</span><span class="o">.</span><span class="n">write</span><span class="p">(</span>
+        <span class="n">crypto</span><span class="o">.</span><span class="n">dump_privatekey</span><span class="p">(</span><span class="n">crypto</span><span class="o">.</span><span class="n">FILETYPE_PEM</span><span class="p">,</span> <span class="n">key</span><span class="p">)</span>
+    <span class="p">)</span>
+    <span class="n">key_file</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+
+    <span class="c"># Return file names</span>
+    <span class="k">return</span> <span class="p">(</span><span class="n">cert_file_name</span><span class="p">,</span> <span class="n">key_file_name</span><span class="p">)</span>
+</pre></div>
+
+
+<p>With this function at hand we can now write a test that ensures it's possible to use SSL with our asyncio library. Note that this test uses the <a href="https://asynctest.readthedocs.io/en/latest/">asynctest</a> library to write asyncio tests.</p>
+<div class="highlight"><pre><span class="kn">import</span> <span class="nn">asyncio</span>
+<span class="kn">import</span> <span class="nn">asynctest</span>
+<span class="kn">import</span> <span class="nn">ssl</span>
+<span class="kn">import</span> <span class="nn">os</span>
+
+<span class="k">class</span> <span class="nc">TestSSLDataFetcher</span><span class="p">(</span><span class="n">asynctest</span><span class="o">.</span><span class="n">TestCase</span><span class="p">):</span>
+      <span class="k">def</span> <span class="nf">setUp</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+          <span class="c"># Create the certificate file and key</span>
+          <span class="bp">self</span><span class="o">.</span><span class="n">_cert_file</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cert_key</span> <span class="o">=</span> <span class="n">create_temp_self_signed_cert</span><span class="p">()</span>
+
+          <span class="c"># Start the mock server, with an SSL context using our certificate</span>
+          <span class="n">ssl_context</span> <span class="o">=</span> <span class="n">ssl</span><span class="o">.</span><span class="n">create_default_context</span><span class="p">(</span><span class="n">ssl</span><span class="o">.</span><span class="n">Purpose</span><span class="o">.</span><span class="n">CLIENT_AUTH</span><span class="p">)</span>
+          <span class="n">ssl_context</span><span class="o">.</span><span class="n">load_cert_chain</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_cert_file</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cert_key</span><span class="p">)</span>
+          <span class="bp">self</span><span class="o">.</span><span class="n">_server</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">loop</span><span class="o">.</span><span class="n">run_until_complete</span><span class="p">(</span>
+              <span class="n">MockDataServer</span><span class="p">(</span><span class="n">host</span><span class="o">=</span><span class="s">&#39;localhost&#39;</span><span class="p">,</span> <span class="n">port</span><span class="o">=</span><span class="mi">1234</span><span class="p">,</span> <span class="n">ssl_context</span><span class="o">=</span><span class="n">ssl_context</span><span class="p">)</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+          <span class="p">)</span>
+
+      <span class="n">async</span> <span class="k">def</span> <span class="nf">tearDown</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+          <span class="bp">self</span><span class="o">.</span><span class="n">_server</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+          <span class="n">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">wait_for</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_server</span><span class="o">.</span><span class="n">wait_closed</span><span class="p">(),</span> <span class="mi">1</span><span class="p">)</span>
+          <span class="n">os</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_cert_file</span><span class="p">)</span>
+          <span class="n">os</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_cert_key</span><span class="p">)</span>
+
+      <span class="n">async</span> <span class="k">def</span> <span class="nf">test_client_can_connect_to_server_over_ssl</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+          <span class="n">ssl_context</span> <span class="o">=</span> <span class="n">ssl</span><span class="o">.</span><span class="n">create_default_context</span><span class="p">(</span><span class="n">ssl</span><span class="o">.</span><span class="n">Purpose</span><span class="o">.</span><span class="n">SERVER_AUTH</span><span class="p">,</span> <span class="n">cafile</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_cert_file</span><span class="p">)</span>
+          <span class="n">fetcher</span> <span class="o">=</span> <span class="n">DataFetcher</span><span class="p">(</span><span class="n">host</span><span class="o">=</span><span class="s">&#39;localhost&#39;</span><span class="p">,</span> <span class="n">port</span><span class="o">=</span><span class="mi">1234</span><span class="p">,</span> <span class="n">ssl_context</span><span class="o">=</span><span class="n">ssl_context</span><span class="p">)</span>
+          <span class="n">data</span> <span class="o">=</span> <span class="n">await</span> <span class="n">fetcher</span><span class="o">.</span><span class="n">get_the_data</span><span class="p">(</span><span class="s">&#39;hello&#39;</span><span class="p">)</span>
+          <span class="k">assert</span> <span class="n">data</span> <span class="o">==</span> <span class="s">&#39;HELLO&#39;</span>
+
+      <span class="n">async</span> <span class="k">def</span> <span class="nf">test_invalid_certificate_raises_error</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+          <span class="n">other_cert_file</span><span class="p">,</span> <span class="n">other_cert_key</span> <span class="o">=</span> <span class="n">create_temp_self_signed_cert</span><span class="p">()</span>
+          <span class="n">ssl_context</span> <span class="o">=</span> <span class="n">ssl</span><span class="o">.</span><span class="n">create_default_context</span><span class="p">(</span><span class="n">ssl</span><span class="o">.</span><span class="n">Purpose</span><span class="o">.</span><span class="n">SERVER_AUTH</span><span class="p">,</span> <span class="n">cafile</span><span class="o">=</span><span class="n">other_cert_file</span><span class="p">)</span>
+          <span class="n">fetcher</span> <span class="o">=</span> <span class="n">DataFetcher</span><span class="p">(</span><span class="n">host</span><span class="o">=</span><span class="s">&#39;localhost&#39;</span><span class="p">,</span> <span class="n">port</span><span class="o">=</span><span class="mi">1234</span><span class="p">,</span> <span class="n">ssl_context</span><span class="o">=</span><span class="n">ssl_context</span><span class="p">)</span>
+          <span class="k">try</span><span class="p">:</span>
+              <span class="n">await</span> <span class="n">fetcher</span><span class="o">.</span><span class="n">get_the_data</span><span class="p">(</span><span class="s">&#39;hello&#39;</span><span class="p">)</span>
+          <span class="k">except</span> <span class="n">ssl</span><span class="o">.</span><span class="n">SSLError</span><span class="p">:</span>
+              <span class="k">assert</span> <span class="bp">True</span>
+          <span class="k">else</span><span class="p">:</span>
+              <span class="k">assert</span> <span class="bp">False</span>
+</pre></div>
+
+
+<p>If these tests pass you know your client library can communicate over SSL if required. As it's handled transparently by asyncio (and if you trust asyncio itself is well tested), you don't need to repeat all your other tests under SSL - just making sure a connection can happen is enough.</p>
+            </div>
+        </div>
+    </div>
+        </div>
+
+        <div id="footer">
+            <p>Alice online: <a href="http://github.com/aliceh75">GitHub</a> <a href="https://twitter.com/aliceheaton75">Twitter</a></p>
+            <p>Site generated by <a href="http://pelican.readthedocs.org">Pelican</a>, theme loosely based on <a href="https://github.com/tbunnyman/pelican-chunk">Chunk</a></p>
+            <p>All content by Alice Heaton, licensed under a <a rel="license" href="http://creativecommons.org/licenses/by-sa/4.0/">Creative Commons Attribution-ShareAlike 4.0 International License</a>
+               <a rel="license" href="http://creativecommons.org/licenses/by-sa/4.0/"><img alt="Creative Commons Licence" style="border-width:0" src="http://i.creativecommons.org/l/by-sa/4.0/80x15.png" /></a>
+            </p>
+        </div>
+    </div>
+</body>
+</html>

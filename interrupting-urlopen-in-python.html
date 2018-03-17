@@ -3,13 +3,13 @@
 <head>
     <title>Alice/Development Notes &mdash; Interrupting urlopen in Python</title>
     <meta charset="utf-8"/>
-    <link rel="stylesheet" type="text/css" href="http://aliceh75.github.io/theme/css/style.css"/>
+    <link rel="stylesheet" type="text/css" href="https://aliceh75.github.io/theme/css/style.css"/>
 </head>
 
 <body>
     <div id="container">
         <div id="header">
-                <div id="site-title"><a href="http://aliceh75.github.io">Alice/Development Notes</a></div>
+                <div id="site-title"><a href="https://aliceh75.github.io">Alice/Development Notes</a></div>
         </div>
 
         <div id="contents">
@@ -18,12 +18,12 @@
             <div class="date">Fri 25 July 2014</div>
             <div class="author">By Alice Heaton</div>
                 <div class="tag-list">
-                        <a href="http://aliceh75.github.io/tag/python" rel="tag">#python</a>
+                        <a href="https://aliceh75.github.io/tag/python" rel="tag">#python</a>
                 </div>
         </div>
         <div class="entry-main">
             <h1 class="entry-title">
-                <a href="http://aliceh75.github.io/interrupting-urlopen-in-python" title="Interrupting urlopen in Python"
+                <a href="https://aliceh75.github.io/interrupting-urlopen-in-python" title="Interrupting urlopen in Python"
                    rel="bookmark">Interrupting urlopen in Python</a>
             </h1>
             <div class="entry-content">
@@ -39,16 +39,16 @@
     <span class="k">if</span> <span class="n">url_p</span><span class="o">.</span><span class="n">path</span><span class="p">:</span>
       <span class="n">path</span> <span class="o">=</span> <span class="n">url_p</span><span class="o">.</span><span class="n">path</span>
     <span class="k">else</span><span class="p">:</span>
-      <span class="n">path</span> <span class="o">=</span> <span class="s1">&#39;/&#39;</span>
+      <span class="n">path</span> <span class="o">=</span> <span class="s">&#39;/&#39;</span>
     <span class="k">if</span> <span class="n">url_p</span><span class="o">.</span><span class="n">query</span><span class="p">:</span>
-      <span class="n">path</span> <span class="o">=</span> <span class="n">path</span> <span class="o">+</span> <span class="s1">&#39;?&#39;</span> <span class="o">+</span> <span class="n">url_p</span><span class="o">.</span><span class="n">query</span>
+      <span class="n">path</span> <span class="o">=</span> <span class="n">path</span> <span class="o">+</span> <span class="s">&#39;?&#39;</span> <span class="o">+</span> <span class="n">url_p</span><span class="o">.</span><span class="n">query</span>
     <span class="n">request</span> <span class="o">=</span> <span class="p">[</span>
-        <span class="s2">&quot;GET {} HTTP/1.1&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">path</span><span class="p">),</span>
-        <span class="s2">&quot;Host: {}&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">url_p</span><span class="o">.</span><span class="n">netloc</span><span class="p">),</span>
-        <span class="s2">&quot;Connection: close&quot;</span><span class="p">,</span>
-        <span class="s2">&quot;User-Agent: here-be-dragrons/0.1&quot;</span>
+        <span class="s">&quot;GET {} HTTP/1.1&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">path</span><span class="p">),</span>
+        <span class="s">&quot;Host: {}&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">url_p</span><span class="o">.</span><span class="n">netloc</span><span class="p">),</span>
+        <span class="s">&quot;Connection: close&quot;</span><span class="p">,</span>
+        <span class="s">&quot;User-Agent: here-be-dragrons/0.1&quot;</span>
     <span class="p">]</span>
-    <span class="k">return</span> <span class="s2">&quot;</span><span class="se">\r\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">request</span><span class="p">)</span> <span class="o">+</span> <span class="s2">&quot;</span><span class="se">\r\n\r\n</span><span class="s2">&quot;</span>
+    <span class="k">return</span> <span class="s">&quot;</span><span class="se">\r\n</span><span class="s">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">request</span><span class="p">)</span> <span class="o">+</span> <span class="s">&quot;</span><span class="se">\r\n\r\n</span><span class="s">&quot;</span>
 </pre></div>
 
 
@@ -57,8 +57,8 @@
 <div class="highlight"><pre><span class="kn">import</span> <span class="nn">socket</span>
 <span class="k">def</span> <span class="nf">send_request</span><span class="p">(</span><span class="n">url</span><span class="p">):</span>
     <span class="n">url_p</span> <span class="o">=</span> <span class="n">urlparse</span><span class="p">(</span><span class="n">url</span><span class="p">)</span>
-    <span class="k">if</span> <span class="s1">&#39;:&#39;</span> <span class="ow">in</span> <span class="n">url_p</span><span class="o">.</span><span class="n">netloc</span><span class="p">:</span>
-      <span class="p">(</span><span class="n">host</span><span class="p">,</span> <span class="n">port</span><span class="p">)</span> <span class="o">=</span> <span class="n">url_p</span><span class="o">.</span><span class="n">netloc</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;:&#39;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="s">&#39;:&#39;</span> <span class="ow">in</span> <span class="n">url_p</span><span class="o">.</span><span class="n">netloc</span><span class="p">:</span>
+      <span class="p">(</span><span class="n">host</span><span class="p">,</span> <span class="n">port</span><span class="p">)</span> <span class="o">=</span> <span class="n">url_p</span><span class="o">.</span><span class="n">netloc</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s">&#39;:&#39;</span><span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>
       <span class="n">host</span> <span class="o">=</span> <span class="n">url_p</span><span class="o">.</span><span class="n">netloc</span>
       <span class="n">port</span> <span class="o">=</span> <span class="mi">80</span>
@@ -95,7 +95,7 @@
     <span class="n">status</span> <span class="o">=</span> <span class="n">r</span><span class="o">.</span><span class="n">status</span>
     <span class="n">body</span> <span class="o">=</span> <span class="n">r</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
   <span class="k">finally</span><span class="p">:</span>
-    <span class="n">r</span><span class="o">.</span><span class="n">close</span><span class="p">()</span> <span class="c1"># Note that this does not close the socket.</span>
+    <span class="n">r</span><span class="o">.</span><span class="n">close</span><span class="p">()</span> <span class="c"># Note that this does not close the socket.</span>
   <span class="k">return</span> <span class="p">(</span><span class="n">status</span><span class="p">,</span> <span class="n">body</span><span class="p">)</span>
 </pre></div>
 
@@ -108,11 +108,11 @@
     <span class="k">if</span> <span class="n">event_has_happened</span><span class="p">():</span>
       <span class="k">raise</span> <span class="n">GiveUp</span><span class="p">()</span>
 
-<span class="n">sock</span> <span class="o">=</span> <span class="n">send_request</span><span class="p">(</span><span class="s1">&#39;http://example.com/big-data-please?quantity=lots&#39;</span><span class="p">)</span>
+<span class="n">sock</span> <span class="o">=</span> <span class="n">send_request</span><span class="p">(</span><span class="s">&#39;http://example.com/big-data-please?quantity=lots&#39;</span><span class="p">)</span>
 <span class="k">try</span><span class="p">:</span>
     <span class="n">wait_for_request</span><span class="p">(</span><span class="n">sock</span><span class="p">,</span> <span class="n">test_interrupt</span><span class="p">)</span>
     <span class="p">(</span><span class="n">status</span><span class="p">,</span> <span class="n">body</span><span class="p">)</span> <span class="o">=</span> <span class="n">read_response</span><span class="p">(</span><span class="n">sock</span><span class="p">)</span>
-    <span class="k">print</span> <span class="s2">&quot;We got response code &quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">status</span><span class="p">)</span> <span class="o">+</span> <span class="s2">&quot; and body &quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">body</span><span class="p">)</span>
+    <span class="k">print</span> <span class="s">&quot;We got response code &quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">status</span><span class="p">)</span> <span class="o">+</span> <span class="s">&quot; and body &quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">body</span><span class="p">)</span>
 <span class="k">finally</span><span class="p">:</span>
     <span class="n">sock</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
 </pre></div>
