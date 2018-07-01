@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Alice/Development Notes &mdash; Python asynchronous cooperative mode</title>
+    <meta charset="utf-8"/>
+    <link rel="stylesheet" type="text/css" href="https://aliceh75.github.io/theme/css/style.css"/>
+</head>
+
+<body>
+    <div id="container">
+        <div id="header">
+                <div id="site-title"><a href="https://aliceh75.github.io">Alice/Development Notes</a></div>
+        </div>
+
+        <div id="contents">
+    <div class="post">
+        <div class="entry-meta">
+            <div class="date">Sat 30 June 2018</div>
+            <div class="author">By Alice Heaton</div>
+                <div class="tag-list">
+                        <a href="https://aliceh75.github.io/tag/async" rel="tag">#async</a>
+                        <a href="https://aliceh75.github.io/tag/python" rel="tag">#python</a>
+                </div>
+        </div>
+        <div class="entry-main">
+            <h1 class="entry-title">
+                <a href="https://aliceh75.github.io/python-asynchronous-cooperative-mode" title="Python asynchronous cooperative mode"
+                   rel="bookmark">Python asynchronous cooperative mode</a>
+            </h1>
+            <div class="entry-content">
+                  <p>With the addition of <a href="https://docs.python.org/3.5/library/asyncio.html">asyncio</a> in the Python 3.4 stdlib and the <a href="https://www.python.org/dev/peps/pep-0492/">async/await syntax</a> in Python 3.5, co-operative asynchronous programing is now an official part of Python. The co-operative asynchronous mode is not complicated to use - but the Python ecosystem is a bit confusing at first. Here I give an introduction to asynchronous programing concepts and eco-system in Python. </p>
+<h2>Definitions</h2>
+<ul>
+<li>
+<p><em>asynchronous</em> means you don't wait on blocking operations - eg. file reads or http connections. You allow other code to run while you wait;</p>
+</li>
+<li>
+<p><em>co-operative</em> means that the code decides when it's time to pause (on some IO operation in most cases) and allow other code to run. There isn't a scheduler to take control away.</p>
+</li>
+</ul>
+<h2>Single threaded</h2>
+<p>The point of Python's asynchronous mode is that it's single threaded. All the logic of switching between tasks is done in Python, in a single OS thread. The typical use case is for concurrent services that serve multiple requests at the same time and are IO bound (ie. where most of the time is spent waiting on IO operations, such as file reads, database queries or remote API queries) - eg. web servers.</p>
+<p>Because each request spends most of it's time waiting on IO, many requests can be served on a single thread - avoiding thread context switches which are comparatively expensive (or process context switches which are even more expensive). The idea of implementing web servers in that way has been around for a while, and was popularised by <a href="https://nodejs.org">Node.js</a></p>
+<p>It's worth noting some Python asynchronous libraries will use threads in the background - for examples <a href="https://pypi.org/project/aiofiles/">aiofiles</a> does that because of <a href="https://github.com/python/asyncio/wiki/ThirdParty#filesystem]">operating system limitations</a>, so using asynchronous libraries does not completely remove the need for threads (<a href="https://stackoverflow.com/questions/20346097/does-node-js-use-threads-thread-pool-internally#20346545">Node.js does the same</a>).</p>
+<h2>Async/Await syntax</h2>
+<p>Historically in NodeJS asynchronicity was implemented using either callbacks or <a href="https://en.wikipedia.org/wiki/Promise_(programming)">Promises</a>. Callbacks notoriously make code hard to reason about, and while Promises and Futures partly help with that they still rely on code being invoked separately later, making reasoning sometimes difficult. Nathaniel J. Smith's post "<a href="https://vorpus.org/blog/notes-on-structured-concurrency-or-go-statement-considered-harmful/">Notes on structured concurrency, or: Go statement considered harmful</a>" goes some length into looking at why code that relies on callbacks, promises or futures is ultimately harder to reason about.</p>
+<p>The <code>async/await</code> syntax provides an alternative. The syntax exists in various languages amongst which C#, Python and Javascript (in ES7, though people already use it thanks to transpilers).</p>
+<p>In Python it is used like this:</p>
+<div class="highlight"><pre><span class="n">async</span> <span class="k">def</span> <span class="nf">my_function</span><span class="p">():</span>
+    <span class="n">url</span> <span class="o">=</span> <span class="n">prepare_my_url</span><span class="p">()</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">await</span> <span class="n">make_some_http_request</span><span class="p">(</span><span class="n">url</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">process_the_result</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>
+</pre></div>
+
+
+<p>Where:</p>
+<ul>
+<li><code>async def</code> means the function is one that might pause itself by calling <code>await</code>;</li>
+<li><code>await make_somt_http_request(url)</code> means that the function will pause execution at that point, to be resumed only after the <code>make_some_http_request</code> returns a result.</li>
+</ul>
+<p>Internally the call to <code>await</code> is actually run using <code>yield from</code> - it uses the same mechanisms as <code>yield</code> to pause the execution of a function.</p>
+<h2>The Python eco-system</h2>
+<p>While the syntax is simple, the eco-system is a bit complicated at first. Here are some points worth noting:</p>
+<ul>
+<li>
+<p>The <code>async/await</code> <em>keywords</em> were introduced in Python 3.5. These are just keywords, they don't do much of their own - you need an asynchronous library to make the thing happen;</p>
+</li>
+<li>
+<p>The Python stdlib asynchronous library - <a href="https://docs.python.org/3.5/library/asyncio.html">asyncio</a> - was introduced in Python 3.4, before the <code>async/await</code> keywords. So you'll see some documentation that refers to the old syntax (<code>@coroutine</code> decorator instead of <code>async def</code>, and <code>yield from</code> instead of <code>await</code>);</p>
+</li>
+<li>
+<p>Libraries must be designed to be non-blocking. You can't use the stdlib file operations, because they are blocking. You need to use an asynchronous file library instead. You can't use the stdlib http module because it's blocking, you need an asynchronous http library, etc. This means all IO libraries must be duplicated, which doesn't sound ideal, but is necessary if you want true single-threaded non-blocking IO;</p>
+</li>
+<li>
+<p>When using <a href="https://docs.python.org/3.5/library/asyncio.html">asyncio</a> (or, presumably, any low level async library) you have to create the event loop, add tasks to it, and run the event loop yourself. People with some Javascript experience will be used to this being handled by the execution environment - in Python it's down to libraries to do it. The advantage is that people can implement this in different ways depending on their needs (see next point). Higher level frameworks (such as ready-made async web frameworks) might do this for you;</p>
+</li>
+<li>
+<p>There are alternatives to asyncio. As all Python itself defines are some keywords, anyone can write an asynchronous framework. Two possible alternatives are <a href="https://github.com/dabeaz/curio">curio</a> and <a href="https://trio.readthedocs.io/en/latest/">trio</a>. You also have libraries that replace parts of the system only - for example <a href="https://github.com/MagicStack/uvloop">uvloop</a> is a faster drop-in replacement for asyncio's event loop.</p>
+</li>
+</ul>
+<h2>Further reading</h2>
+<p>There is, of course, the Python documentation as well as numerous tutorials on-line which are easy to find. In addition to those, here are a few posts that I have found interesting while trying to understand how asynchronous programing works in Python, it's background and it's problems:</p>
+<ul>
+<li><a href="https://robertoprevato.github.io/Comparisons-of-async-await/">Comparison of async await syntax in .NET, Python and JavaScript</a></li>
+<li><a href="https://vorpus.org/blog/some-thoughts-on-asynchronous-api-design-in-a-post-asyncawait-world/">Some thoughts on asynchronous API design in a post-async/await world</a></li>
+<li><a href="https://vorpus.org/blog/notes-on-structured-concurrency-or-go-statement-considered-harmful/">Notes on structured concurrency, or: Go statement considered harmful</a></li>
+</ul>
+            </div>
+        </div>
+    </div>
+        </div>
+
+        <div id="footer">
+            <p>Alice online: <a href="http://github.com/aliceh75">GitHub</a> <a href="https://twitter.com/aliceheaton75">Twitter</a></p>
+            <p>Site generated by <a href="http://pelican.readthedocs.org">Pelican</a>, theme loosely based on <a href="https://github.com/tbunnyman/pelican-chunk">Chunk</a></p>
+            <p>All content by Alice Heaton, licensed under a <a rel="license" href="http://creativecommons.org/licenses/by-sa/4.0/">Creative Commons Attribution-ShareAlike 4.0 International License</a>
+               <a rel="license" href="http://creativecommons.org/licenses/by-sa/4.0/"><img alt="Creative Commons Licence" style="border-width:0" src="http://i.creativecommons.org/l/by-sa/4.0/80x15.png" /></a>
+            </p>
+        </div>
+    </div>
+</body>
+</html>
