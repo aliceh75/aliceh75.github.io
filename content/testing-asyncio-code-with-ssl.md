@@ -1,7 +1,7 @@
 Title: Testing Python asyncio code with SSL
 Date: 2018-03-01
 Slug: testing-asyncio-with-ssl
-Tags: python, asyncio
+Tags: python, async, asyncio
 Summary: The [asyncio](https://docs.python.org/3/library/asyncio.html) library introduced in Python 3.4 allows us to write concurrent code running, amongst other things, network clients and servers. Here I show how to unit-test asyncio code to ensure it is possible to use it over an SSL connection.
 
 The [asyncio](https://docs.python.org/3/library/asyncio.html) library introduced in Python 3.4 allows us to write concurrent code running, amongst other things, network clients and servers. Here I show how to unit-test asyncio code to ensure it is possible to use it over an SSL connection. 
