@@ -33,32 +33,32 @@
 <p>As is often the case, this web server doesn't output anything (including response headers) until it has the full response at hand. Unfortunately, while most Python libraries for fetching web content allow us to split the work in multiple calls (send request, read data, close request) the initial send request typically does not return until the response headers are available. This is the case for <a href="https://docs.python.org/2/library/urllib2.html">urlopen</a>, <a href="https://docs.python.org/2/library/httplib.html">httplib</a> and, as far as I call tell, <a href="http://docs.python-requests.org/en/latest/">request</a></p>
 <h2>Sending a request</h2>
 <p>In fact the highest level library that will allow us to do this is <a href="https://docs.python.org/2/library/socket.html">socket</a>. This means we are going to build the HTTP request ourselves - this is straightforward, though for more complicated cases <code>httplib</code> might be useful. The following method will build an HTTP GET request:</p>
-<div class="highlight"><pre><span class="kn">from</span> <span class="nn">urlparse</span> <span class="kn">import</span> <span class="n">urlparse</span>
+<div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">urlparse</span> <span class="kn">import</span> <span class="n">urlparse</span>
 <span class="k">def</span> <span class="nf">http_request</span><span class="p">(</span><span class="n">url</span><span class="p">):</span>
     <span class="n">url_p</span> <span class="o">=</span> <span class="n">urlparse</span><span class="p">(</span><span class="n">url</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">url_p</span><span class="o">.</span><span class="n">path</span><span class="p">:</span>
       <span class="n">path</span> <span class="o">=</span> <span class="n">url_p</span><span class="o">.</span><span class="n">path</span>
     <span class="k">else</span><span class="p">:</span>
-      <span class="n">path</span> <span class="o">=</span> <span class="s">&#39;/&#39;</span>
+      <span class="n">path</span> <span class="o">=</span> <span class="s1">&#39;/&#39;</span>
     <span class="k">if</span> <span class="n">url_p</span><span class="o">.</span><span class="n">query</span><span class="p">:</span>
-      <span class="n">path</span> <span class="o">=</span> <span class="n">path</span> <span class="o">+</span> <span class="s">&#39;?&#39;</span> <span class="o">+</span> <span class="n">url_p</span><span class="o">.</span><span class="n">query</span>
+      <span class="n">path</span> <span class="o">=</span> <span class="n">path</span> <span class="o">+</span> <span class="s1">&#39;?&#39;</span> <span class="o">+</span> <span class="n">url_p</span><span class="o">.</span><span class="n">query</span>
     <span class="n">request</span> <span class="o">=</span> <span class="p">[</span>
-        <span class="s">&quot;GET {} HTTP/1.1&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">path</span><span class="p">),</span>
-        <span class="s">&quot;Host: {}&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">url_p</span><span class="o">.</span><span class="n">netloc</span><span class="p">),</span>
-        <span class="s">&quot;Connection: close&quot;</span><span class="p">,</span>
-        <span class="s">&quot;User-Agent: here-be-dragrons/0.1&quot;</span>
+        <span class="s2">&quot;GET {} HTTP/1.1&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">path</span><span class="p">),</span>
+        <span class="s2">&quot;Host: {}&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">url_p</span><span class="o">.</span><span class="n">netloc</span><span class="p">),</span>
+        <span class="s2">&quot;Connection: close&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;User-Agent: here-be-dragrons/0.1&quot;</span>
     <span class="p">]</span>
-    <span class="k">return</span> <span class="s">&quot;</span><span class="se">\r\n</span><span class="s">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">request</span><span class="p">)</span> <span class="o">+</span> <span class="s">&quot;</span><span class="se">\r\n\r\n</span><span class="s">&quot;</span>
+    <span class="k">return</span> <span class="s2">&quot;</span><span class="se">\r\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">request</span><span class="p">)</span> <span class="o">+</span> <span class="s2">&quot;</span><span class="se">\r\n\r\n</span><span class="s2">&quot;</span>
 </pre></div>
 
 
 <p>Note that the request must end with an empty line, and that the line separator should be "\r\n". You can add more headers there as needed, though those are sufficient.</p>
 <p>Now that we have a request string, we need to send it. Using the socket library this is straightforward:</p>
-<div class="highlight"><pre><span class="kn">import</span> <span class="nn">socket</span>
+<div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">socket</span>
 <span class="k">def</span> <span class="nf">send_request</span><span class="p">(</span><span class="n">url</span><span class="p">):</span>
     <span class="n">url_p</span> <span class="o">=</span> <span class="n">urlparse</span><span class="p">(</span><span class="n">url</span><span class="p">)</span>
-    <span class="k">if</span> <span class="s">&#39;:&#39;</span> <span class="ow">in</span> <span class="n">url_p</span><span class="o">.</span><span class="n">netloc</span><span class="p">:</span>
-      <span class="p">(</span><span class="n">host</span><span class="p">,</span> <span class="n">port</span><span class="p">)</span> <span class="o">=</span> <span class="n">url_p</span><span class="o">.</span><span class="n">netloc</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s">&#39;:&#39;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="s1">&#39;:&#39;</span> <span class="ow">in</span> <span class="n">url_p</span><span class="o">.</span><span class="n">netloc</span><span class="p">:</span>
+      <span class="p">(</span><span class="n">host</span><span class="p">,</span> <span class="n">port</span><span class="p">)</span> <span class="o">=</span> <span class="n">url_p</span><span class="o">.</span><span class="n">netloc</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;:&#39;</span><span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>
       <span class="n">host</span> <span class="o">=</span> <span class="n">url_p</span><span class="o">.</span><span class="n">netloc</span>
       <span class="n">port</span> <span class="o">=</span> <span class="mi">80</span>
@@ -74,7 +74,7 @@
 
 
 <p>And that's it, the request has been send. To check whether the reply has arrived we can use the <a href="https://docs.python.org/2/library/select.html">select</a> library:</p>
-<div class="highlight"><pre><span class="kn">import</span> <span class="nn">socket</span>
+<div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">socket</span>
 
 <span class="k">def</span> <span class="nf">wait_for_request</span><span class="p">(</span><span class="n">sock</span><span class="p">,</span> <span class="n">test_interrupt</span><span class="p">,</span> <span class="n">sleep_time</span><span class="o">=</span><span class="mf">0.1</span><span class="p">)</span>
     <span class="n">rl</span> <span class="o">=</span> <span class="p">[]</span>
@@ -87,7 +87,7 @@
 <p><code>test_interrupt</code> is a function which will raise an exception should the query be interrupted. The caller should make sure to close the socket properly when this happens.</p>
 <h2>Reading the result</h2>
 <p>Once the data is ready, we can read it with <code>socket.recv</code>. This however means we would have to parse the HTTP request ourselves. Depending on which server we are contacting, this is a bit more difficult than generating the HTTP query was. Instead of parsing it ourselves, we can us <a href="https://docs.python.org/2/library/httplib.html#httplib.HTTPResponse"><code>httplib.HTTPResponse</code></a>. While the documentation suggests this class is not instantiated directly by the user, it doesn't say we shouldn't - the class' definition is documented and, lo and behold, the first argument to that is a socket. Using this reading the server response is easy:</p>
-<div class="highlight"><pre><span class="kn">from</span> <span class="nn">httplib</span> <span class="kn">import</span> <span class="n">HTTPResponse</span>
+<div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">httplib</span> <span class="kn">import</span> <span class="n">HTTPResponse</span>
 <span class="k">def</span> <span class="nf">read_response</span><span class="p">(</span><span class="n">sock</span><span class="p">):</span>
   <span class="n">r</span> <span class="o">=</span> <span class="n">HTTPResponse</span><span class="p">(</span><span class="n">sock</span><span class="p">)</span>
   <span class="k">try</span><span class="p">:</span>
@@ -95,24 +95,24 @@
     <span class="n">status</span> <span class="o">=</span> <span class="n">r</span><span class="o">.</span><span class="n">status</span>
     <span class="n">body</span> <span class="o">=</span> <span class="n">r</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
   <span class="k">finally</span><span class="p">:</span>
-    <span class="n">r</span><span class="o">.</span><span class="n">close</span><span class="p">()</span> <span class="c"># Note that this does not close the socket.</span>
+    <span class="n">r</span><span class="o">.</span><span class="n">close</span><span class="p">()</span> <span class="c1"># Note that this does not close the socket.</span>
   <span class="k">return</span> <span class="p">(</span><span class="n">status</span><span class="p">,</span> <span class="n">body</span><span class="p">)</span>
 </pre></div>
 
 
 <p>That's all - we can now get the response status code and the response body. A complete example using the various functions we've implemented:</p>
-<div class="highlight"><pre><span class="k">class</span> <span class="nc">GiveUp</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
+<div class="highlight"><pre><span></span><span class="k">class</span> <span class="nc">GiveUp</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
   <span class="k">pass</span>
 
 <span class="k">def</span> <span class="nf">test_interrupt</span><span class="p">():</span>
     <span class="k">if</span> <span class="n">event_has_happened</span><span class="p">():</span>
       <span class="k">raise</span> <span class="n">GiveUp</span><span class="p">()</span>
 
-<span class="n">sock</span> <span class="o">=</span> <span class="n">send_request</span><span class="p">(</span><span class="s">&#39;http://example.com/big-data-please?quantity=lots&#39;</span><span class="p">)</span>
+<span class="n">sock</span> <span class="o">=</span> <span class="n">send_request</span><span class="p">(</span><span class="s1">&#39;http://example.com/big-data-please?quantity=lots&#39;</span><span class="p">)</span>
 <span class="k">try</span><span class="p">:</span>
     <span class="n">wait_for_request</span><span class="p">(</span><span class="n">sock</span><span class="p">,</span> <span class="n">test_interrupt</span><span class="p">)</span>
     <span class="p">(</span><span class="n">status</span><span class="p">,</span> <span class="n">body</span><span class="p">)</span> <span class="o">=</span> <span class="n">read_response</span><span class="p">(</span><span class="n">sock</span><span class="p">)</span>
-    <span class="k">print</span> <span class="s">&quot;We got response code &quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">status</span><span class="p">)</span> <span class="o">+</span> <span class="s">&quot; and body &quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">body</span><span class="p">)</span>
+    <span class="k">print</span> <span class="s2">&quot;We got response code &quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">status</span><span class="p">)</span> <span class="o">+</span> <span class="s2">&quot; and body &quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">body</span><span class="p">)</span>
 <span class="k">finally</span><span class="p">:</span>
     <span class="n">sock</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
 </pre></div>

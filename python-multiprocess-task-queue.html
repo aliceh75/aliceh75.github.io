@@ -33,7 +33,7 @@
 <p>As my solution builds on the existing simple solutions I found, I thought I would share it here.</p>
 <h2>Simple approach</h2>
 <p>The basic approach using multiprocessing (the one I found explained on various sites) looks something like this:</p>
-<div class="highlight"><pre><span class="kn">import</span> <span class="nn">multiprocessing</span>
+<div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">multiprocessing</span>
 
 <span class="k">def</span> <span class="nf">_worker</span><span class="p">(</span><span class="n">queue</span><span class="p">):</span>
     <span class="k">while</span> <span class="bp">True</span><span class="p">:</span>
@@ -41,7 +41,7 @@
         <span class="n">task</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
 
 <span class="k">class</span> <span class="nc">TaskQueue</span><span class="p">():</span>
-    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">workers</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">workers</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_queue</span> <span class="o">=</span> <span class="n">multiprocessing</span><span class="o">.</span><span class="n">Queue</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_pool</span> <span class="o">=</span> <span class="n">multiprocessing</span><span class="o">.</span><span class="n">Pool</span><span class="p">(</span><span class="n">workers</span><span class="p">,</span> <span class="n">_worker</span><span class="p">,</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_queue</span><span class="p">,))</span>
 
@@ -51,14 +51,14 @@
 
 
 <p>And that's it - it is really simple to implement. The tasks need to be an object with a <code>run</code> method, for instance:</p>
-<div class="highlight"><pre><span class="k">class</span> <span class="nc">MyTask</span><span class="p">():</span>
-    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">param</span><span class="p">):</span>
-        <span class="c"># This is run on the main process, when the task is crated</span>
+<div class="highlight"><pre><span></span><span class="k">class</span> <span class="nc">MyTask</span><span class="p">():</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">param</span><span class="p">):</span>
+        <span class="c1"># This is run on the main process, when the task is crated</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">param</span> <span class="o">=</span> <span class="n">param</span>
 
     <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="c"># This is run on the child process. We can do something with param</span>
-        <span class="c"># (note that we must be able to pickle param)</span>
+        <span class="c1"># This is run on the child process. We can do something with param</span>
+        <span class="c1"># (note that we must be able to pickle param)</span>
         <span class="k">pass</span>
 </pre></div>
 
@@ -72,13 +72,13 @@
 <p>To implement this with the previous approach of using a <code>Queue</code> requires a bit of work. The workers would have to have a loop to exit after a certain number of requests; we'd have to be able to instruct the workers to terminate, and we would need a separate thread to restart workers that have stopped.</p>
 <p>Instead we can use <code>multiprocessing.Pool</code> - it allows us to specify the number of requests served by each worker by specifying <code>maxtasksperchild</code>. Our workers cannot be an infinite loop anymore however, so we need another way to send parameters to the workers. Calling <code>apply_async</code> for each task does just that - and <code>multiprocessing.Pool</code> handles the queueing for us. Arguably this approach is actually simpler than the previous one - though not one I found online.</p>
 <p><code>Pool.close</code> and <code>Pool.terminate</code> can be used to write a <code>terminate</code> method. So the implementation would now be:</p>
-<div class="highlight"><pre><span class="k">def</span> <span class="nf">_worker</span><span class="p">(</span><span class="n">task</span><span class="p">):</span>
+<div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">_worker</span><span class="p">(</span><span class="n">task</span><span class="p">):</span>
     <span class="n">task</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
     <span class="k">return</span> <span class="bp">True</span>
 
 
 <span class="k">class</span> <span class="nc">TaskQueue</span><span class="p">():</span>
-    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">worker_count</span><span class="p">,</span> <span class="n">requests_per_worker</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">worker_count</span><span class="p">,</span> <span class="n">requests_per_worker</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_pool</span> <span class="o">=</span> <span class="n">multiprocessing</span><span class="o">.</span><span class="n">Pool</span><span class="p">(</span><span class="n">worker_count</span><span class="p">,</span> <span class="n">maxtasksperchild</span><span class="o">=</span><span class="n">requests_per_worker</span><span class="p">)</span>
 
     <span class="k">def</span> <span class="nf">add</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">task</span><span class="p">):</span>
@@ -95,8 +95,8 @@
 <p>Note the implementation of terminate here is a bit naive. We don't have a way to tell when a worker has stopped, so <code>terminate</code> will sleep even if all the tasks closed immediately. We will improve on this later on.</p>
 <h2>Tracking operations</h2>
 <p>We'd like to be able to tell how many tasks are in the queue, and how many have been processed altogether. For this we'll use <code>apply_async</code>'s return object which tells us when a task has finished (as well as it's return value, though we don't care about this in the current implementation). This will also allow us to implement <code>terminate</code> properly. The implementation is straightforward - though I'll include it here for completeness.</p>
-<div class="highlight"><pre><span class="k">class</span> <span class="nc">TaskQueue</span><span class="p">():</span>
-    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">worker_count</span><span class="p">,</span> <span class="n">requests_per_worker</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+<div class="highlight"><pre><span></span><span class="k">class</span> <span class="nc">TaskQueue</span><span class="p">():</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">worker_count</span><span class="p">,</span> <span class="n">requests_per_worker</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_pool</span> <span class="o">=</span> <span class="n">multiprocessing</span><span class="o">.</span><span class="n">Pool</span><span class="p">(</span><span class="n">worker_count</span><span class="p">,</span> <span class="n">maxtasksperchild</span><span class="o">=</span><span class="n">requests_per_worker</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_tasks</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_processed_count</span> <span class="o">=</span> <span class="mi">0</span>
@@ -105,7 +105,7 @@
     <span class="k">def</span> <span class="nf">add</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">task</span><span class="p">):</span>
         <span class="n">r</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_pool</span><span class="o">.</span><span class="n">apply_async</span><span class="p">(</span><span class="n">_worker</span><span class="p">,</span> <span class="p">(</span><span class="n">task</span><span class="p">,))</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_tasks</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">r</span><span class="p">)</span>
-        <span class="c"># Call flush here to ensure we clean up even if length/processed are never called.</span>
+        <span class="c1"># Call flush here to ensure we clean up even if length/processed are never called.</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_flush</span><span class="p">()</span>
 
     <span class="k">def</span> <span class="nf">length</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -141,27 +141,27 @@
 <p>Note that <code>length</code> returns the number of items that are either in the queue, or currently being processed. This is fine for my use case - to make the distinction between the queues we'd have to track (using a <code>Queue</code>) when each worker actually starts processing the task.</p>
 <h2>Logging</h2>
 <p>We want to log what's happening - when workers start, when they are killed, when they start and finish processing tasks. We can't use the normal logger classes as they do not work across processes - instead we need to use the logger provided by <code>multiprocessing.get_logger</code>. Setting the log level to <code>INFO</code> will ensure <code>multiprocessing</code> logs when the workers start and end, and we can log when tasks start and end ourselves in <code>_worker</code>:</p>
-<div class="highlight"><pre><span class="k">def</span> <span class="nf">_worker</span><span class="p">(</span><span class="n">task</span><span class="p">):</span>
+<div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">_worker</span><span class="p">(</span><span class="n">task</span><span class="p">):</span>
     <span class="n">logger</span> <span class="o">=</span> <span class="n">multiprocessing</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span>
     <span class="nb">id</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">getpid</span><span class="p">()</span>
     <span class="k">try</span><span class="p">:</span>
         <span class="n">desc</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">task</span><span class="p">)</span>
     <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
-        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s">&quot;Worker {} failed to get task description. {}&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="nb">id</span><span class="p">,</span> <span class="n">format_exc</span><span class="p">()))</span>
-        <span class="n">desc</span> <span class="o">=</span> <span class="s">&#39;(unknown)&#39;</span>
-    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s">&quot;Worker {} processing task {}&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="nb">id</span><span class="p">,</span> <span class="n">desc</span><span class="p">))</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Worker {} failed to get task description. {}&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="nb">id</span><span class="p">,</span> <span class="n">format_exc</span><span class="p">()))</span>
+        <span class="n">desc</span> <span class="o">=</span> <span class="s1">&#39;(unknown)&#39;</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Worker {} processing task {}&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="nb">id</span><span class="p">,</span> <span class="n">desc</span><span class="p">))</span>
     <span class="k">try</span><span class="p">:</span>
         <span class="n">task</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
     <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
-        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s">&quot;Worker {} failed task {}. {}&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="nb">id</span><span class="p">,</span> <span class="n">desc</span><span class="p">,</span> <span class="n">format_exc</span><span class="p">()))</span>
-    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s">&quot;Worker {} done with task {}&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="nb">id</span><span class="p">,</span> <span class="n">desc</span><span class="p">,</span> <span class="n">e</span><span class="p">))</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Worker {} failed task {}. {}&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="nb">id</span><span class="p">,</span> <span class="n">desc</span><span class="p">,</span> <span class="n">format_exc</span><span class="p">()))</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Worker {} done with task {}&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="nb">id</span><span class="p">,</span> <span class="n">desc</span><span class="p">,</span> <span class="n">e</span><span class="p">))</span>
     <span class="k">return</span> <span class="bp">True</span>
 </pre></div>
 
 
 <p>Note that we use <code>format_exc</code> (import it from <code>traceback</code>) to display the full backtrace of any exception that makes it that far - there is nothing above us, and the exception will get lost if we don't display it.</p>
 <p>If you are embedding this in a larger application, you may not have the opportunity to change the application's logger object to use the multiprocessing one (so that all logs go to the same place). Assuming you can set the log handler used by the application you can deal with this issue by implementing a log handler which forwards logs to the multiprocessing logger:</p>
-<div class="highlight"><pre><span class="kn">import</span> <span class="nn">logging</span>
+<div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">logging</span>
 <span class="kn">import</span> <span class="nn">multiprocessing</span>
 
 
@@ -174,16 +174,16 @@
 
 
 <p>You can then replace the application's log handler with an instance of this one. For example in Flask:</p>
-<div class="highlight"><pre><span class="c"># Set up the multiprocessing logger</span>
+<div class="highlight"><pre><span></span><span class="c1"># Set up the multiprocessing logger</span>
 <span class="n">m_logger</span> <span class="o">=</span> <span class="n">multiprocessing</span><span class="o">.</span><span class="n">get_logger</span><span class="p">()</span>
 <span class="n">m_logger</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">)</span>
 <span class="n">m_logger</span><span class="o">.</span><span class="n">addHandler</span><span class="p">(</span><span class="n">login</span><span class="o">.</span><span class="n">StreamHandler</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="p">))</span>
 
-<span class="c"># Remove any existing log handlers in the application handler</span>
+<span class="c1"># Remove any existing log handlers in the application handler</span>
 <span class="k">while</span> <span class="nb">len</span><span class="p">(</span><span class="n">app</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">handlers</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
     <span class="n">app</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">removeHandler</span><span class="p">(</span><span class="n">app</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">handlers</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
 
-<span class="c"># And add our custom handler to the application logger</span>
+<span class="c1"># And add our custom handler to the application logger</span>
 <span class="n">app</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">)</span>
 <span class="n">app</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">addHandler</span><span class="p">(</span><span class="n">MultiprocessingLogHandler</span><span class="p">())</span>
 </pre></div>

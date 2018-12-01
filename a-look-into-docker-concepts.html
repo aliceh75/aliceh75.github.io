@@ -38,14 +38,14 @@
 <p>Docker uses <a href="http://en.wikipedia.org/wiki/Union_mount">union mount</a> file systems to create it's containers. The idea is that you create an apparent file system based on several file systems layered on top of each other - such that each layer has priority over the layers below. Only the final layer is read/write, all the others being read only.</p>
 <p>The advantage of this approach is that containers are actually lightweight. Say you have a host that runs two containers: one running PostgreSQL and one running Apache2. Assuming that you've build both containers on top of a base Ubuntu 12.04 image, then your host will only store a single copy of the Ubuntu 12.04 base layer and use it for both containers.</p>
 <p>So your Postgresql container would look like this:</p>
-<div class="highlight"><pre>-- Read/write layer        --  | A read operation will go down through the layers
+<div class="highlight"><pre><span></span>-- Read/write layer        --  | A read operation will go down through the layers
 -- Postgresql layer        --  | Until it finds a matching file.
 -- Ubuntu 12.04 base layer --  V
 </pre></div>
 
 
 <p>And your Apache2 container would look like this:</p>
-<div class="highlight"><pre>-- Read/write layer        --  | 
+<div class="highlight"><pre><span></span>-- Read/write layer        --  | 
 -- Apache2 layer           --  |
 -- Ubuntu 12.04 base layer --  V
 </pre></div>
@@ -66,7 +66,7 @@
 <h2>Running a container</h2>
 <p>A container, once again, is not a server. A container represents a single service. When you run a container, it will run the single command you specified under <code>CMD</code> in the Dockerfile. When that command exits, the container exits.</p>
 <p>This means that this command should not daemonize. Indeed, the "daemonization" part is one of the things docker does for you - running each container in the background. Because many applications daemonize by default, you will often have to specifically instruct them not to. For instance, for a Postgresql server, your <code>CMD</code> line might look like:</p>
-<div class="highlight"><pre>CMD /usr/lib/postgresql/9.3/bin/postgres -D /var/lib/postgresql/9.3/main -c config_file=/etc/postgresql/9.3/main/postgresql.conf
+<div class="highlight"><pre><span></span>CMD /usr/lib/postgresql/9.3/bin/postgres -D /var/lib/postgresql/9.3/main -c config_file=/etc/postgresql/9.3/main/postgresql.conf
 </pre></div>
 
 
@@ -109,7 +109,7 @@
 <p>One approach to linking containers across multiple hosts without using an orchestration service is to use <a href="https://docs.docker.com/articles/ambassador_pattern_linking/">ambassador containers</a> - containers that proxy requests between two containers. This way if one container moves host, you only need to reconfigure the proxy containers, and you can leave the application containers intact.</p>
 <h3>Container configuration</h3>
 <p>Sometimes links don't work - for instance in a PostgreSQL server you might want to specify which IP addresses are allowed to connect to the server by specifying an IP address and a netmask. One approach to do this is to use a custom entry point in your docker. If you specify <code>ENTRYPOINT ["/usr/local/bin/run.sh"]</code> in your Dockerfile, the script <code>run.sh</code> will be the base command that starts you container. You can then pass additional parameters to that script, for instance the IP address and netmask. The <code>run.sh</code> script would take care of allowing the given network before starting PostgreSQL. Such a container would be created by doing:</p>
-<div class="highlight"><pre>   docker create postgres_image 192.168.0.0/24
+<div class="highlight"><pre><span></span>   docker create postgres_image 192.168.0.0/24
 </pre></div>
 
 

@@ -43,35 +43,35 @@
 <h2>Re-implementing the datastore API</h2>
 <p>Thanks to CKAN's architecture, we were able to re-implement the API completely and provide a compatible API that uses Solr, rather then PostgreSQL, for datastore searches: <a href="https://github.com/NaturalHistoryMuseum/ckanext-datasolr">ckanext-datasolr</a>.</p>
 <p>To override calls to the <a href="http://docs.ckan.org/en/latest/maintaining/datastore.html#ckanext.datastore.logic.action.datastore_search">datastore_search</a> API endpoint, we created a plugin that implements the <a href="http://docs.ckan.org/en/latest/extensions/plugin-interfaces.html#ckan.plugins.interfaces.IRoutes">IRoutes interface</a> so we could change where calls to <code>datastore_search</code> would be routed. This is done simply as:</p>
-<div class="highlight"><pre><span class="kn">import</span> <span class="nn">ckan.plugins</span> <span class="kn">as</span> <span class="nn">p</span>
+<div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">ckan.plugins</span> <span class="kn">as</span> <span class="nn">p</span>
 
 <span class="k">class</span> <span class="nc">DataSolrPlugin</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">SingletonPlugin</span><span class="p">):</span>
     <span class="n">p</span><span class="o">.</span><span class="n">implements</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">IRoutes</span><span class="p">,</span> <span class="n">inherit</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
 
     <span class="k">def</span> <span class="nf">before_map</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="nb">map</span><span class="p">):</span> 
         <span class="nb">map</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span>
-            <span class="s">&#39;datasolr&#39;</span><span class="p">,</span>
-            <span class="s">&#39;/api/3/action/datastore_search&#39;</span><span class="p">,</span>
-            <span class="n">controller</span><span class="o">=</span><span class="s">&#39;api&#39;</span><span class="p">,</span>
-            <span class="n">action</span><span class="o">=</span><span class="s">&#39;action&#39;</span><span class="p">,</span>
-            <span class="n">logic_function</span><span class="o">=</span><span class="s">&#39;datastore_solr_search&#39;</span><span class="p">,</span>
-            <span class="n">ver</span><span class="o">=</span><span class="s">u&#39;/3&#39;</span>
+            <span class="s1">&#39;datasolr&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;/api/3/action/datastore_search&#39;</span><span class="p">,</span>
+            <span class="n">controller</span><span class="o">=</span><span class="s1">&#39;api&#39;</span><span class="p">,</span>
+            <span class="n">action</span><span class="o">=</span><span class="s1">&#39;action&#39;</span><span class="p">,</span>
+            <span class="n">logic_function</span><span class="o">=</span><span class="s1">&#39;datastore_solr_search&#39;</span><span class="p">,</span>
+            <span class="n">ver</span><span class="o">=</span><span class="sa">u</span><span class="s1">&#39;/3&#39;</span>
         <span class="p">)</span>
 </pre></div>
 
 
 <p>We need to declare our logic function <code>datastore_solr_search</code> by implementing the <a href="http://docs.ckan.org/en/latest/extensions/plugin-interfaces.html#ckan.plugins.interfaces.IActions">IActions</a> interface in our plugin:</p>
-<div class="highlight"><pre><span class="c"># ...</span>
+<div class="highlight"><pre><span></span><span class="c1"># ...</span>
 <span class="kn">from</span> <span class="nn">ckanext.datasolr.logic.action</span> <span class="kn">import</span> <span class="n">datastore_solr_search</span>
 
 <span class="k">class</span> <span class="nc">DataSolrPlugin</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">SingletonPlugin</span><span class="p">):</span>
-    <span class="c"># ...</span>
+    <span class="c1"># ...</span>
     <span class="n">p</span><span class="o">.</span><span class="n">implements</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">interfaces</span><span class="o">.</span><span class="n">IActions</span><span class="p">)</span>
 
-    <span class="c"># ...</span>
+    <span class="c1"># ...</span>
     <span class="k">def</span> <span class="nf">get_actions</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="p">{</span>
-            <span class="s">&#39;datastore_solr_search&#39;</span><span class="p">:</span> <span class="n">datastore_solr_search</span>
+            <span class="s1">&#39;datastore_solr_search&#39;</span><span class="p">:</span> <span class="n">datastore_solr_search</span>
         <span class="p">}</span>
 </pre></div>
 
@@ -80,7 +80,7 @@
 <h2>Making the new plugin extensible</h2>
 <p>CKAN's <a href="http://docs.ckan.org/en/latest/extensions/plugin-interfaces.html">interface architecture</a> which allows plugins to easily add functionality to other parts of the system is another element that allowed us to implement this plugin. As such, and given that the <a href="https://github.com/ckan/ckan/blob/master/ckanext/datastore/interfaces.py">datastore extension has it's own interface</a>, it seemed like a good idea to implement one for our plugin.</p>
 <p>This is done simply by creating a class that inherits from <a href="https://github.com/ckan/ckan/blob/master/ckan/plugins/interfaces.py">ckan.plugins.interfaces.Interface</a>:</p>
-<div class="highlight"><pre><span class="kn">from</span> <span class="nn">ckan.plugins</span> <span class="kn">import</span> <span class="n">interfaces</span>
+<div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">ckan.plugins</span> <span class="kn">import</span> <span class="n">interfaces</span>
 
 <span class="k">class</span> <span class="nc">IDataSolr</span><span class="p">(</span><span class="n">interfaces</span><span class="o">.</span><span class="n">Interface</span><span class="p">):</span>
     <span class="k">def</span> <span class="nf">datasolr_validate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">context</span><span class="p">,</span> <span class="n">data_dict</span><span class="p">,</span> <span class="n">field_types</span><span class="p">):</span>
@@ -93,7 +93,7 @@
 
 <p>Plugins that want to add their own validation and/or to modify the search expression just need to implement this interface. They need to declare this by including <code>ckan.plugins.implements(IDataSolr)</code>.</p>
 <p>The <code>ckanext_datasolr</code> code can now invokes all plugins that extend it by doing, for example:</p>
-<div class="highlight"><pre><span class="kn">from</span> <span class="nn">ckan.plugins</span> <span class="kn">import</span> <span class="n">PluginImplementations</span>
+<div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">ckan.plugins</span> <span class="kn">import</span> <span class="n">PluginImplementations</span>
 
 <span class="k">for</span> <span class="n">plugin</span> <span class="ow">in</span> <span class="n">PluginImplementations</span><span class="p">(</span><span class="n">IDataSolr</span><span class="p">):</span>
     <span class="n">data_dict</span> <span class="o">=</span> <span class="n">plugin</span><span class="o">.</span><span class="n">datasolr_validate</span><span class="p">(</span>

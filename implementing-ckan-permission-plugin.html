@@ -51,7 +51,7 @@
 <p>We do not want to fully override the functionality of those functions; we only want to treat a special case: allow a user who has the <code>member</code> role in an organization to create a dataset, and edit/delete datasets they have created. For all other cases we want to fallback on CKAN's default implementation. CKAN does not provide a mechanism for falling back to the default function (though <a href="https://github.com/ckan/ckan/issues/1784">there is an implementation in the works</a>), but it is easy enough to implement - I've created my own <code>get_default_auth</code> and <code>get_default_action</code> which I can easily replace when CKAN supports this.</p>
 <p>To make it easy to map various auth functions to each other I have used the same structure used by CKAN itself, so my functions reside in <code>ckanext.userdatasets.logic.auth.create.package_create</code>, <code>ckanext.userdatasets.logic.auth.delete.package_delete</code>, etc. and we can map them using a simple loop. Note that the plugin also provides support for <a href="https://github.com/ckan/ckan/tree/1251-resource-view">CKAN's 1251 branch</a>, so it also checks for <code>resource_view_*</code> functions and override them if they exist.</p>
 <p>Here is the code for plugin.py at that stage of the implementation:</p>
-<div class="highlight"><pre><span class="kn">import</span> <span class="nn">importlib</span>
+<div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">importlib</span>
 <span class="kn">import</span> <span class="nn">ckan.plugins</span> <span class="kn">as</span> <span class="nn">p</span>
 
 <span class="n">config</span> <span class="o">=</span> <span class="p">{}</span>
@@ -70,17 +70,17 @@
 
     <span class="k">def</span> <span class="nf">configure</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">main_config</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;Implementation of IConfigurable.configure&quot;&quot;&quot;</span>
-        <span class="n">config</span><span class="p">[</span><span class="s">&#39;default_auth_module&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;userdatasets.default_auth_module&#39;</span><span class="p">,</span> <span class="s">&#39;ckan.logic.auth&#39;</span><span class="p">)</span>
+        <span class="n">config</span><span class="p">[</span><span class="s1">&#39;default_auth_module&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;userdatasets.default_auth_module&#39;</span><span class="p">,</span> <span class="s1">&#39;ckan.logic.auth&#39;</span><span class="p">)</span>
 
     <span class="k">def</span> <span class="nf">get_auth_functions</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;Implementation of IAuthFunctions.get_auth_functions&quot;&quot;&quot;</span>
-        <span class="c"># We override all of create/update/delete for packages, resources and resource views.</span>
+        <span class="c1"># We override all of create/update/delete for packages, resources and resource views.</span>
         <span class="n">auth_functions</span> <span class="o">=</span> <span class="p">{}</span>
-        <span class="k">for</span> <span class="n">action</span> <span class="ow">in</span> <span class="p">[</span><span class="s">&#39;create&#39;</span><span class="p">,</span> <span class="s">&#39;update&#39;</span><span class="p">,</span> <span class="s">&#39;delete&#39;</span><span class="p">]:</span>
-            <span class="n">default_module</span> <span class="o">=</span> <span class="n">importlib</span><span class="o">.</span><span class="n">import_module</span><span class="p">(</span><span class="n">config</span><span class="p">[</span><span class="s">&#39;default_auth_module&#39;</span><span class="p">]</span> <span class="o">+</span> <span class="s">&#39;.&#39;</span> <span class="o">+</span> <span class="n">action</span><span class="p">)</span>
-            <span class="n">uds_module</span> <span class="o">=</span> <span class="n">importlib</span><span class="o">.</span><span class="n">import_module</span><span class="p">(</span><span class="s">&#39;ckanext.userdatasets.logic.auth.&#39;</span> <span class="o">+</span> <span class="n">action</span><span class="p">)</span>
-            <span class="k">for</span> <span class="n">atype</span> <span class="ow">in</span> <span class="p">[</span><span class="s">&#39;package&#39;</span><span class="p">,</span> <span class="s">&#39;resource&#39;</span><span class="p">,</span> <span class="s">&#39;resource_view&#39;</span><span class="p">]:</span>
-                <span class="n">fn_name</span> <span class="o">=</span> <span class="n">atype</span> <span class="o">+</span> <span class="s">&#39;_&#39;</span> <span class="o">+</span> <span class="n">action</span>
+        <span class="k">for</span> <span class="n">action</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;create&#39;</span><span class="p">,</span> <span class="s1">&#39;update&#39;</span><span class="p">,</span> <span class="s1">&#39;delete&#39;</span><span class="p">]:</span>
+            <span class="n">default_module</span> <span class="o">=</span> <span class="n">importlib</span><span class="o">.</span><span class="n">import_module</span><span class="p">(</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;default_auth_module&#39;</span><span class="p">]</span> <span class="o">+</span> <span class="s1">&#39;.&#39;</span> <span class="o">+</span> <span class="n">action</span><span class="p">)</span>
+            <span class="n">uds_module</span> <span class="o">=</span> <span class="n">importlib</span><span class="o">.</span><span class="n">import_module</span><span class="p">(</span><span class="s1">&#39;ckanext.userdatasets.logic.auth.&#39;</span> <span class="o">+</span> <span class="n">action</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">atype</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;package&#39;</span><span class="p">,</span> <span class="s1">&#39;resource&#39;</span><span class="p">,</span> <span class="s1">&#39;resource_view&#39;</span><span class="p">]:</span>
+                <span class="n">fn_name</span> <span class="o">=</span> <span class="n">atype</span> <span class="o">+</span> <span class="s1">&#39;_&#39;</span> <span class="o">+</span> <span class="n">action</span>
                 <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">default_module</span><span class="p">,</span> <span class="n">fn_name</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">uds_module</span><span class="p">,</span> <span class="n">fn_name</span><span class="p">):</span>
                     <span class="n">auth_functions</span><span class="p">[</span><span class="n">fn_name</span><span class="p">]</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">uds_module</span><span class="p">,</span> <span class="n">fn_name</span><span class="p">)</span>
 
@@ -94,7 +94,7 @@
 <span class="sd">    @param function: Name of function. It must exists.</span>
 <span class="sd">    @return: The auth function</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">default_module</span> <span class="o">=</span> <span class="n">importlib</span><span class="o">.</span><span class="n">import_module</span><span class="p">(</span><span class="n">config</span><span class="p">[</span><span class="s">&#39;default_auth_module&#39;</span><span class="p">]</span> <span class="o">+</span> <span class="s">&#39;.&#39;</span> <span class="o">+</span> <span class="n">ftype</span><span class="p">)</span>
+    <span class="n">default_module</span> <span class="o">=</span> <span class="n">importlib</span><span class="o">.</span><span class="n">import_module</span><span class="p">(</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;default_auth_module&#39;</span><span class="p">]</span> <span class="o">+</span> <span class="s1">&#39;.&#39;</span> <span class="o">+</span> <span class="n">ftype</span><span class="p">)</span>
     <span class="k">return</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">default_module</span><span class="p">,</span> <span class="n">function_name</span><span class="p">)</span>
 </pre></div>
 
@@ -105,7 +105,7 @@
 <li><code>user_owns_package_as_member</code> which allows us to check if the given user created the given package and has the member role in the package's organization.</li>
 </ul>
 <p>The implementation is as follows:</p>
-<div class="highlight"><pre><span class="kn">from</span> <span class="nn">ckan</span> <span class="kn">import</span> <span class="n">logic</span>
+<div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">ckan</span> <span class="kn">import</span> <span class="n">logic</span>
 <span class="kn">from</span> <span class="nn">ckan.new_authz</span> <span class="kn">import</span> <span class="n">users_role_for_group_or_org</span>
 
 <span class="k">def</span> <span class="nf">user_is_member_of_package_org</span><span class="p">(</span><span class="n">user</span><span class="p">,</span> <span class="n">package</span><span class="p">):</span>
@@ -117,7 +117,7 @@
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">package</span><span class="o">.</span><span class="n">owner_org</span><span class="p">:</span>
         <span class="n">role_in_org</span> <span class="o">=</span> <span class="n">users_role_for_group_or_org</span><span class="p">(</span><span class="n">package</span><span class="o">.</span><span class="n">owner_org</span><span class="p">,</span> <span class="n">user</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">role_in_org</span> <span class="o">==</span> <span class="s">&#39;member&#39;</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">role_in_org</span> <span class="o">==</span> <span class="s1">&#39;member&#39;</span><span class="p">:</span>
             <span class="k">return</span> <span class="bp">True</span>
    <span class="k">return</span> <span class="bp">False</span>
 
@@ -137,20 +137,20 @@
 
 
 <p>From there the implementation of the auth functions is straight forward. As an example here is <code>resource_create</code>:</p>
-<div class="highlight"><pre><span class="kn">from</span> <span class="nn">ckan.logic.auth</span> <span class="kn">import</span> <span class="n">get_package_object</span><span class="p">,</span> <span class="n">get_resource_object</span>
+<div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">ckan.logic.auth</span> <span class="kn">import</span> <span class="n">get_package_object</span><span class="p">,</span> <span class="n">get_resource_object</span>
 <span class="kn">from</span> <span class="nn">ckan.new_authz</span> <span class="kn">import</span> <span class="n">users_role_for_group_or_org</span><span class="p">,</span> <span class="n">has_user_permission_for_some_org</span>
 <span class="kn">from</span> <span class="nn">ckanext.userdatasets.plugin</span> <span class="kn">import</span> <span class="n">get_default_auth</span>
 
 
 <span class="k">def</span> <span class="nf">resource_create</span><span class="p">(</span><span class="n">context</span><span class="p">,</span> <span class="n">data_dict</span><span class="p">):</span>
-    <span class="n">user</span> <span class="o">=</span> <span class="n">context</span><span class="p">[</span><span class="s">&#39;auth_user_obj&#39;</span><span class="p">]</span>
+    <span class="n">user</span> <span class="o">=</span> <span class="n">context</span><span class="p">[</span><span class="s1">&#39;auth_user_obj&#39;</span><span class="p">]</span>
     <span class="n">package</span> <span class="o">=</span> <span class="n">get_package_object</span><span class="p">(</span><span class="n">context</span><span class="p">,</span> <span class="n">data_dict</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">user_owns_package_as_member</span><span class="p">(</span><span class="n">user</span><span class="p">,</span> <span class="n">package</span><span class="p">):</span>
-        <span class="k">return</span> <span class="p">{</span><span class="s">&#39;success&#39;</span><span class="p">:</span> <span class="bp">True</span><span class="p">}</span>
+        <span class="k">return</span> <span class="p">{</span><span class="s1">&#39;success&#39;</span><span class="p">:</span> <span class="bp">True</span><span class="p">}</span>
     <span class="k">elif</span> <span class="n">user_is_member_of_package_org</span><span class="p">(</span><span class="n">user</span><span class="p">,</span> <span class="n">package</span><span class="p">):</span>
-        <span class="k">return</span> <span class="p">{</span><span class="s">&#39;success&#39;</span><span class="p">:</span> <span class="bp">False</span><span class="p">}</span>
+        <span class="k">return</span> <span class="p">{</span><span class="s1">&#39;success&#39;</span><span class="p">:</span> <span class="bp">False</span><span class="p">}</span>
 
-    <span class="n">fallback</span> <span class="o">=</span> <span class="n">get_default_auth</span><span class="p">(</span><span class="s">&#39;create&#39;</span><span class="p">,</span> <span class="s">&#39;resource_create&#39;</span><span class="p">)</span>
+    <span class="n">fallback</span> <span class="o">=</span> <span class="n">get_default_auth</span><span class="p">(</span><span class="s1">&#39;create&#39;</span><span class="p">,</span> <span class="s1">&#39;resource_create&#39;</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">fallback</span><span class="p">(</span><span class="n">context</span><span class="p">,</span> <span class="n">data_dict</span><span class="p">)</span>
 </pre></div>
 
@@ -160,27 +160,27 @@
 <p>Unfortunately overriding auth functions is not enough. Some of CKAN's validators also perform auth tests - an issue <a href="https://github.com/ckan/ckan/issues/1775">that should be resolved soon</a>. Until the issue is resolved, we must override those validators to allow packages to be created.</p>
 <p>The validators that need to be overridden have to be identified by trial and error. <code>package_create</code> (itself an action) calls <code>ckan.lib.plugins.plugin_validate</code> on the form data, which uses the validator <code>ckan.logic.validators.owner_org_validator</code> and which in turns calls <code>ckan.new_authz.has_user_permission_for_group_or_org</code>. The latter fails us. Unfortunately, nothing in the call stack below <code>package_create</code> can be overridden using CKAN's API, so the only option is to override that one.</p>
 <p>What I have done is re-implement (ahem, copy) the functionality, but changed the list of validators used to validate the input - replacing, in that particular context, <code>ckan.logic.validators.owner_org_validator</code> with our own copy. The change is minor:</p>
-<div class="highlight"><pre><span class="kn">from</span> <span class="nn">ckan.logic.validators</span> <span class="kn">import</span> <span class="n">owner_org_validator</span> <span class="k">as</span> <span class="n">default_oov</span>
+<div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">ckan.logic.validators</span> <span class="kn">import</span> <span class="n">owner_org_validator</span> <span class="k">as</span> <span class="n">default_oov</span>
 <span class="kn">from</span> <span class="nn">ckanext.userdatasets.logic.validators</span> <span class="kn">import</span> <span class="n">owner_org_validator</span> <span class="k">as</span> <span class="n">uds_oov</span>
 <span class="p">[</span><span class="o">.....</span><span class="p">]</span>
 <span class="k">def</span> <span class="nf">package_create</span><span class="p">(</span><span class="n">context</span><span class="p">,</span> <span class="n">data_dict</span><span class="p">):</span>
     <span class="p">[</span><span class="o">....</span><span class="p">]</span>
-    <span class="n">package_type</span> <span class="o">=</span> <span class="n">data_dict</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;type&#39;</span><span class="p">)</span>
+    <span class="n">package_type</span> <span class="o">=</span> <span class="n">data_dict</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;type&#39;</span><span class="p">)</span>
     <span class="n">package_plugin</span> <span class="o">=</span> <span class="n">lib_plugins</span><span class="o">.</span><span class="n">lookup_package_plugin</span><span class="p">(</span><span class="n">package_type</span><span class="p">)</span>
-    <span class="k">if</span> <span class="s">&#39;schema&#39;</span> <span class="ow">in</span> <span class="n">context</span><span class="p">:</span>
-        <span class="n">schema</span> <span class="o">=</span> <span class="n">context</span><span class="p">[</span><span class="s">&#39;schema&#39;</span><span class="p">]</span>
+    <span class="k">if</span> <span class="s1">&#39;schema&#39;</span> <span class="ow">in</span> <span class="n">context</span><span class="p">:</span>
+        <span class="n">schema</span> <span class="o">=</span> <span class="n">context</span><span class="p">[</span><span class="s1">&#39;schema&#39;</span><span class="p">]</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="n">schema</span> <span class="o">=</span> <span class="n">package_plugin</span><span class="o">.</span><span class="n">create_package_schema</span><span class="p">()</span>
-    <span class="c"># We modify the schema here to replace owner_org_validator by our own</span>
-    <span class="k">if</span> <span class="s">&#39;owner_org&#39;</span> <span class="ow">in</span> <span class="n">schema</span><span class="p">:</span>
-        <span class="n">schema</span><span class="p">[</span><span class="s">&#39;owner_org&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="n">uds_oov</span> <span class="k">if</span> <span class="n">f</span> <span class="ow">is</span> <span class="n">default_oov</span> <span class="k">else</span> <span class="n">f</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">schema</span><span class="p">[</span><span class="s">&#39;owner_org&#39;</span><span class="p">]]</span>
+    <span class="c1"># We modify the schema here to replace owner_org_validator by our own</span>
+    <span class="k">if</span> <span class="s1">&#39;owner_org&#39;</span> <span class="ow">in</span> <span class="n">schema</span><span class="p">:</span>
+        <span class="n">schema</span><span class="p">[</span><span class="s1">&#39;owner_org&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="n">uds_oov</span> <span class="k">if</span> <span class="n">f</span> <span class="ow">is</span> <span class="n">default_oov</span> <span class="k">else</span> <span class="n">f</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">schema</span><span class="p">[</span><span class="s1">&#39;owner_org&#39;</span><span class="p">]]</span>
 
     <span class="p">[</span><span class="o">.....</span><span class="p">]</span>
 </pre></div>
 
 
 <p>The implementation of <code>ckanext.userdatasets.logic.validators.owner_org_validator</code> itself is straightforward:</p>
-<div class="highlight"><pre><span class="kn">import</span> <span class="nn">ckan.lib.navl.dictization_functions</span> <span class="kn">as</span> <span class="nn">df</span>
+<div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">ckan.lib.navl.dictization_functions</span> <span class="kn">as</span> <span class="nn">df</span>
 <span class="kn">from</span> <span class="nn">ckan.new_authz</span> <span class="kn">import</span> <span class="n">users_role_for_group_or_org</span>
 <span class="kn">from</span> <span class="nn">ckan.logic.validators</span> <span class="kn">import</span> <span class="n">owner_org_validator</span> <span class="k">as</span> <span class="n">default_oov</span>
 
@@ -188,10 +188,10 @@
 
 <span class="k">def</span> <span class="nf">owner_org_validator</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">errors</span><span class="p">,</span> <span class="n">context</span><span class="p">):</span>
     <span class="n">owner_org</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
-    <span class="n">user</span> <span class="o">=</span> <span class="n">context</span><span class="p">[</span><span class="s">&#39;auth_user_obj&#39;</span><span class="p">]</span>
-    <span class="k">if</span> <span class="n">owner_org</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">missing</span> <span class="ow">and</span> <span class="n">owner_org</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span> <span class="ow">and</span> <span class="n">owner_org</span> <span class="o">!=</span> <span class="s">&#39;&#39;</span><span class="p">:</span>
+    <span class="n">user</span> <span class="o">=</span> <span class="n">context</span><span class="p">[</span><span class="s1">&#39;auth_user_obj&#39;</span><span class="p">]</span>
+    <span class="k">if</span> <span class="n">owner_org</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">missing</span> <span class="ow">and</span> <span class="n">owner_org</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span> <span class="ow">and</span> <span class="n">owner_org</span> <span class="o">!=</span> <span class="s1">&#39;&#39;</span><span class="p">:</span>
         <span class="n">role</span> <span class="o">=</span> <span class="n">users_role_for_group_or_org</span><span class="p">(</span><span class="n">owner_org</span><span class="p">,</span> <span class="n">user</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">role</span> <span class="o">==</span> <span class="s">&#39;member&#39;</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">role</span> <span class="o">==</span> <span class="s1">&#39;member&#39;</span><span class="p">:</span>
             <span class="k">return</span>
 
     <span class="n">default_oov</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">errors</span><span class="p">,</span> <span class="n">context</span><span class="p">)</span>

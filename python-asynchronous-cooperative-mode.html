@@ -46,7 +46,7 @@
 <p>Historically in NodeJS asynchronicity was implemented using either callbacks or <a href="https://en.wikipedia.org/wiki/Promise_(programming)">Promises</a>. Callbacks notoriously make code hard to reason about, and while Promises and Futures partly help with that they still rely on code being invoked separately later, making reasoning sometimes difficult. Nathaniel J. Smith's post "<a href="https://vorpus.org/blog/notes-on-structured-concurrency-or-go-statement-considered-harmful/">Notes on structured concurrency, or: Go statement considered harmful</a>" goes some length into looking at why code that relies on callbacks, promises or futures is ultimately harder to reason about.</p>
 <p>The <code>async/await</code> syntax provides an alternative. The syntax exists in various languages amongst which C#, Python and Javascript (in ES7, though people already use it thanks to transpilers).</p>
 <p>In Python it is used like this:</p>
-<div class="highlight"><pre><span class="n">async</span> <span class="k">def</span> <span class="nf">my_function</span><span class="p">():</span>
+<div class="highlight"><pre><span></span><span class="n">async</span> <span class="k">def</span> <span class="nf">my_function</span><span class="p">():</span>
     <span class="n">url</span> <span class="o">=</span> <span class="n">prepare_my_url</span><span class="p">()</span>
     <span class="n">result</span> <span class="o">=</span> <span class="n">await</span> <span class="n">make_some_http_request</span><span class="p">(</span><span class="n">url</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">process_the_result</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>

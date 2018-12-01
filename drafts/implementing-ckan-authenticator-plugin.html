@@ -40,7 +40,7 @@
 <p>CKAN makes it easy to override the login form - indeed that is something that an authenticator plugin must do anyway as a form submitted by the standard login form does not call <code>IAuthenticator</code> methods.</p>
 <p>To override the login template form we create our own template file (with the same subpath) at <code>ckanext/ldap/templates/user/login.html</code> and add that as a resource by implementing the <code>IConfigurer</code> interface in our plugin. The template we create is a copy of the CKAN login form - we just change the action to take us to our own controller mapped to '/ldap_loggin_handler'.</p>
 <p>Here is the plugin.py that performs both of these:</p>
-<div class="highlight"><pre><span class="kn">import</span> <span class="nn">ckan.plugins</span> <span class="kn">as</span> <span class="nn">p</span>
+<div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">ckan.plugins</span> <span class="kn">as</span> <span class="nn">p</span>
 
 <span class="k">class</span> <span class="nc">LdapPlugin</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">SingletonPlugin</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;&quot;LdapPlugin</span>
@@ -56,31 +56,31 @@
 
 <span class="sd">        Add our custom template to the list of templates so we can override the login form.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="n">toolkit</span><span class="o">.</span><span class="n">add_template_directory</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="s">&#39;templates&#39;</span><span class="p">)</span>
+        <span class="n">toolkit</span><span class="o">.</span><span class="n">add_template_directory</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="s1">&#39;templates&#39;</span><span class="p">)</span>
 
     <span class="k">def</span> <span class="nf">before_map</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="nb">map</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;Implements Iroutes</span>
 
 <span class="sd">        Add our custom login form handler&quot;&quot;&quot;</span>
-        <span class="nb">map</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="s">&#39;/ldap_loggin_handler&#39;</span><span class="p">,</span>
-                    <span class="n">controller</span><span class="o">=</span><span class="s">&#39;ckanext.ldap.controllers.user:UserController&#39;</span><span class="p">,</span>
-                    <span class="n">action</span><span class="o">=</span><span class="s">&#39;login_handler&#39;</span><span class="p">)</span>
+        <span class="nb">map</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="s1">&#39;/ldap_loggin_handler&#39;</span><span class="p">,</span>
+                    <span class="n">controller</span><span class="o">=</span><span class="s1">&#39;ckanext.ldap.controllers.user:UserController&#39;</span><span class="p">,</span>
+                    <span class="n">action</span><span class="o">=</span><span class="s1">&#39;login_handler&#39;</span><span class="p">)</span>
         <span class="k">return</span> <span class="nb">map</span>
 </pre></div>
 
 
 <h2>Configuration</h2>
 <p>As a quick side note: rather than access the main configuration from our plugin, we implement <code>p.IConfigrable</code> and copy locally the configuration settings. This also allows us to check for missing settings, etc. so that the rest of the plugin can count on the settings being as expected. This is the implementation of <code>IConfigurable.configure</code> in <code>plugin.py</code>:</p>
-<div class="highlight"><pre><span class="k">def</span> <span class="nf">configure</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">main_config</span><span class="p">):</span>
+<div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">configure</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">main_config</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;Implementation of IConfigurable.configure&quot;&quot;&quot;</span>
-    <span class="c"># Check for required items</span>
-    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="p">[</span><span class="s">&#39;ldap.uri&#39;</span><span class="p">,</span> <span class="s">&#39;ldap.base_dn&#39;</span><span class="p">,</span> <span class="s">&#39;ldap.search.filter&#39;</span><span class="p">,</span> <span class="s">&#39;ldap.username&#39;</span><span class="p">]:</span>
+    <span class="c1"># Check for required items</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;ldap.uri&#39;</span><span class="p">,</span> <span class="s1">&#39;ldap.base_dn&#39;</span><span class="p">,</span> <span class="s1">&#39;ldap.search.filter&#39;</span><span class="p">,</span> <span class="s1">&#39;ldap.username&#39;</span><span class="p">]:</span>
         <span class="k">if</span> <span class="n">i</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">config</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="n">MissingConfigError</span><span class="p">(</span><span class="s">&#39;Configuration parameter {} is required&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">i</span><span class="p">))</span>
-    <span class="c"># Copy config</span>
-    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="p">[</span><span class="s">&#39;ldap.uri&#39;</span><span class="p">,</span> <span class="s">&#39;ldap.auth.dn&#39;</span><span class="p">,</span> <span class="s">&#39;ldap.auth.password&#39;</span><span class="p">,</span> <span class="s">&#39;ldap.base_dn&#39;</span><span class="p">,</span> <span class="s">&#39;ldap.search.filter&#39;</span><span class="p">,</span>
-              <span class="s">&#39;ldap.search.alt&#39;</span><span class="p">,</span> <span class="s">&#39;ldap.search.alt_msg&#39;</span><span class="p">,</span> <span class="s">&#39;ldap.username&#39;</span><span class="p">,</span> <span class="s">&#39;ldap.fullname&#39;</span><span class="p">,</span> <span class="s">&#39;ldap.email&#39;</span><span class="p">,</span>
-              <span class="s">&#39;ldap.organization.id&#39;</span><span class="p">,</span> <span class="s">&#39;ldap.organization.role&#39;</span><span class="p">]:</span>
+            <span class="k">raise</span> <span class="n">MissingConfigError</span><span class="p">(</span><span class="s1">&#39;Configuration parameter {} is required&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">i</span><span class="p">))</span>
+    <span class="c1"># Copy config</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;ldap.uri&#39;</span><span class="p">,</span> <span class="s1">&#39;ldap.auth.dn&#39;</span><span class="p">,</span> <span class="s1">&#39;ldap.auth.password&#39;</span><span class="p">,</span> <span class="s1">&#39;ldap.base_dn&#39;</span><span class="p">,</span> <span class="s1">&#39;ldap.search.filter&#39;</span><span class="p">,</span>
+              <span class="s1">&#39;ldap.search.alt&#39;</span><span class="p">,</span> <span class="s1">&#39;ldap.search.alt_msg&#39;</span><span class="p">,</span> <span class="s1">&#39;ldap.username&#39;</span><span class="p">,</span> <span class="s1">&#39;ldap.fullname&#39;</span><span class="p">,</span> <span class="s1">&#39;ldap.email&#39;</span><span class="p">,</span>
+              <span class="s1">&#39;ldap.organization.id&#39;</span><span class="p">,</span> <span class="s1">&#39;ldap.organization.role&#39;</span><span class="p">]:</span>
         <span class="n">config</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">main_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
 </pre></div>
 

@@ -30,7 +30,7 @@
                   <p>With most websites now using some form of client side analytics, we do not tend to parse and analyse Apache log files automatically any more. However for people managing web-servers they are still our first port of call when troubleshooting issues. To help quickly working out what is happening I wrote a small command line tool to parse and provide statistics out of Apache log files.</p>
 <p>The tool, inspired by <a href="http://www.exim.org/exim-html-current/doc/html/spec_html/ch-exim_utilities.html#SECTmailstat">eximstats</a>, is called <a href="https://gitlab.com/aliceh75/whathammers"><strong>whathammers</strong></a>. It can parse any Apache log file - the log format is configurable, using the same syntax as the <a href="https://httpd.apache.org/docs/2.2/mod/mod_log_config.html#formats">Apache LogFormat</a> directive, so you can just copy the format from your Apache configuration.</p>
 <p>The reports output by the tool can also be configured - though the defaults are sensible. The general idea is that, for any field available in the log file, you can output the <em>n</em> top values by number of hits or, if your log format includes the time for each request, by total time. Here is an example output, based on a real log file (but with IPs and URLs changed) using an extended log format, that shows the default reports. Note that the first thing output is the list of fields available in the log file:</p>
-<div class="highlight"><pre>Parsing files....
+<div class="highlight"><pre><span></span>Parsing files....
 Logged fields : conn_status, remote_host, remote_logname, remote_user, request_first_line, request_header_referer, request_header_user_a
 gent, request_header_user_agent__browser__family, request_header_user_agent__browser__version_string, request_header_user_agent__is_mobi
 le, request_header_user_agent__os__family, request_header_user_agent__os__version_string, request_header_x_forwarded_for, request_http_v
@@ -98,7 +98,7 @@ time_received by time per hit, 5 slices
 
 
 <p>More advanced functionality can easily be achieved by combining our usual set of command line tools - for example you can simply filter out entries before analysis by using <code>grep -v</code>:</p>
-<div class="highlight"><pre>cat access.log | grep -v 111.111.111.111 | whathammers
+<div class="highlight"><pre><span></span>cat access.log | grep -v 111.111.111.111 | whathammers
 </pre></div>
 
 

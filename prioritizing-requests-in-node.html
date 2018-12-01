@@ -34,7 +34,7 @@
 <p>The idea was then to create a proxy that would only send as many requests as the map server could process at once. The remaining query would be kept in a queue where they could be prioritized. This approach also gave us the opportunity to drop requests from the queue when the client dropped the request - as this was much more complicated to do at the level of the map server itself.</p>
 <p>The implementation was simple: a <a href="http://nodejs.org/api/http.html">node http server</a> takes incoming requests, prioritizes them and puts them in a queue. We then use <a href="https://github.com/nodejitsu/node-http-proxy">node-http-proxy</a> to send them on. A bit of error handling (in particular to detect dropped connections), and user defined request types and priorities - and here we go.</p>
 <p>The class is used in this way:</p>
-<div class="highlight"><pre><span class="kd">var</span> <span class="nx">proxy</span> <span class="o">=</span> <span class="k">new</span> <span class="nx">QueueingProxy</span><span class="p">(</span>
+<div class="highlight"><pre><span></span><span class="kd">var</span> <span class="nx">proxy</span> <span class="o">=</span> <span class="k">new</span> <span class="nx">QueueingProxy</span><span class="p">(</span>
   <span class="mi">4000</span><span class="p">,</span>                      <span class="c1">// Incomming port</span>
   <span class="s1">&#39;http://127.0.0.1:5000&#39;</span><span class="p">,</span>   <span class="c1">// Target server</span>
   <span class="mi">4</span><span class="p">,</span>                         <span class="c1">// Number of requests that get set on at one time (per client)</span>
@@ -54,7 +54,7 @@
 
 <h2>The code</h2>
 <p>The code is rather short (185 lines long), and it is not something I wanted to maintain beyond my immediate needs - so I am sharing it here. It may or may not work out of the box for your needs - this is shared for inspiration, not as a ready made tool!</p>
-<div class="highlight"><pre><span class="kd">var</span> <span class="nx">http</span> <span class="o">=</span> <span class="nx">require</span><span class="p">(</span><span class="s1">&#39;http&#39;</span><span class="p">);</span>
+<div class="highlight"><pre><span></span><span class="kd">var</span> <span class="nx">http</span> <span class="o">=</span> <span class="nx">require</span><span class="p">(</span><span class="s1">&#39;http&#39;</span><span class="p">);</span>
 <span class="kd">var</span> <span class="nx">httpProxy</span> <span class="o">=</span> <span class="nx">require</span><span class="p">(</span><span class="s1">&#39;http-proxy&#39;</span><span class="p">);</span>
 
 <span class="kd">var</span> <span class="nx">_queue_request_id_sec</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
