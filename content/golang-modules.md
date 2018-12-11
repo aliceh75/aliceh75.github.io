@@ -1,14 +1,14 @@
-Title: Using modules for workspaces in golang
+Title: Using modules for workspaces in Go 
 Date: 2018-12-01
 Slug: using-modules-for-workspaces-in-golang
-Tags: golang
-Summary: As of Go 1.11, golang has (experimental) <a href="https://golang.org/doc/go1.11#modules">support for modules</a>. This addresses a number of needs - such as ensuring semantic versioning, ensuring reproducible builds, etc. Here I look specifically at how modules help replace the need for $GOPATH based workspaces.
+Tags: go
+Summary: As of Go 1.11, the Go programming language has (experimental) <a href="https://golang.org/doc/go1.11#modules">support for modules</a>. This addresses a number of needs - such as ensuring semantic versioning, ensuring reproducible builds, etc. Here I look specifically at how modules help replace the need for `$GOPATH` based workspaces.
 
-As of Go 1.11, golang has (experimental) <a href="https://golang.org/doc/go1.11#modules">support for modules</a>. This addresses a number of needs - such as ensuring semantic versioning, ensuring reproducible builds, etc. Here I look specifically at how modules help replace the need for $GOPATH based workspaces.
+As of Go 1.11, the Go programming language has (experimental) <a href="https://golang.org/doc/go1.11#modules">support for modules</a>. This addresses a number of needs - such as ensuring semantic versioning, ensuring reproducible builds, etc. Here I look specifically at how modules help replace the need for `$GOPATH` based workspaces.
 
 In that context a module is simply an isolated collection of packages - as you'd get with a <a href=="https://docs.python.org/3/tutorial/venv.html">Python virtual environment</a>.
 
-With Go 1.11 you create a module by adding a `go.mod` file in a folder outside of your $GOPATH. This file can be created automatically by running `go mod init`:
+With Go 1.11 you create a module by adding a `go.mod` file in a folder outside of your `$GOPATH`. This file can be created automatically by running `go mod init`:
 
 ```
 $ mkdir myexample
