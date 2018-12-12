@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <title>Alice/Development Notes &mdash; Using modules for workspaces in golang</title>
+    <title>Alice/Development Notes &mdash; Using modules for workspaces in Go</title>
     <meta charset="utf-8"/>
     <link rel="stylesheet" type="text/css" href="https://aliceh75.github.io/theme/css/style.css"/>
 </head>
@@ -18,18 +18,18 @@
             <div class="date">Sat 01 December 2018</div>
             <div class="author">By Alice Heaton</div>
                 <div class="tag-list">
-                        <a href="https://aliceh75.github.io/tag/golang" rel="tag">#golang</a>
+                        <a href="https://aliceh75.github.io/tag/go" rel="tag">#go</a>
                 </div>
         </div>
         <div class="entry-main">
             <h1 class="entry-title">
-                <a href="https://aliceh75.github.io/using-modules-for-workspaces-in-golang" title="Using modules for workspaces in golang"
-                   rel="bookmark">Using modules for workspaces in golang</a>
+                <a href="https://aliceh75.github.io/using-modules-for-workspaces-in-golang" title="Using modules for workspaces in Go"
+                   rel="bookmark">Using modules for workspaces in Go</a>
             </h1>
             <div class="entry-content">
-                  <p>As of Go 1.11, golang has (experimental) <a href="https://golang.org/doc/go1.11#modules">support for modules</a>. This addresses a number of needs - such as ensuring semantic versioning, ensuring reproducible builds, etc. Here I look specifically at how modules help replace the need for $GOPATH based workspaces.</p>
+                  <p>As of Go 1.11, the Go programming language has (experimental) <a href="https://golang.org/doc/go1.11#modules">support for modules</a>. This addresses a number of needs - such as ensuring semantic versioning, ensuring reproducible builds, etc. Here I look specifically at how modules help replace the need for <code>$GOPATH</code> based workspaces.</p>
 <p>In that context a module is simply an isolated collection of packages - as you'd get with a <a href=="https://docs.python.org/3/tutorial/venv.html">Python virtual environment</a>.</p>
-<p>With Go 1.11 you create a module by adding a <code>go.mod</code> file in a folder outside of your $GOPATH. This file can be created automatically by running <code>go mod init</code>:</p>
+<p>With Go 1.11 you create a module by adding a <code>go.mod</code> file in a folder outside of your <code>$GOPATH</code>. This file can be created automatically by running <code>go mod init</code>:</p>
 <div class="highlight"><pre><span></span>$ mkdir myexample
 $ <span class="nb">cd</span> myexample
 $ go mod init myexample

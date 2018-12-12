@@ -1,7 +1,252 @@
 <?xml version="1.0" encoding="utf-8"?>
-<feed xmlns="http://www.w3.org/2005/Atom"><title>Alice/Development Notes - Alice Heaton</title><link href="https://aliceh75.github.io/" rel="alternate"></link><link href="https://aliceh75.github.io/feeds/alice-heaton.atom.xml" rel="self"></link><id>https://aliceh75.github.io/</id><updated>2018-12-01T00:00:00+00:00</updated><entry><title>Using modules for workspaces in golang</title><link href="https://aliceh75.github.io/using-modules-for-workspaces-in-golang.html" rel="alternate"></link><published>2018-12-01T00:00:00+00:00</published><updated>2018-12-01T00:00:00+00:00</updated><author><name>Alice Heaton</name></author><id>tag:aliceh75.github.io,2018-12-01:/using-modules-for-workspaces-in-golang.html</id><summary type="html">&lt;p&gt;As of Go 1.11, golang has (experimental) &lt;a href="https://golang.org/doc/go1.11#modules"&gt;support for modules&lt;/a&gt;. This addresses a number of needs - such as ensuring semantic versioning, ensuring reproducible builds, etc. Here I look specifically at how modules help replace the need for $GOPATH based workspaces.&lt;/p&gt;</summary><content type="html">&lt;p&gt;As of Go 1.11, golang has (experimental) &lt;a href="https://golang.org/doc/go1.11#modules"&gt;support for modules&lt;/a&gt;. This addresses a number of needs - such as ensuring semantic versioning, ensuring reproducible builds, etc. Here I look specifically at how modules help replace the need for $GOPATH based workspaces.&lt;/p&gt;
+<feed xmlns="http://www.w3.org/2005/Atom"><title>Alice/Development Notes - Alice Heaton</title><link href="https://aliceh75.github.io/" rel="alternate"></link><link href="https://aliceh75.github.io/feeds/alice-heaton.atom.xml" rel="self"></link><id>https://aliceh75.github.io/</id><updated>2018-12-11T00:00:00+00:00</updated><entry><title>Measuring delay when using webview with Go</title><link href="https://aliceh75.github.io/measuring-delay-when-using-webview-with-go.html" rel="alternate"></link><published>2018-12-11T00:00:00+00:00</published><updated>2018-12-11T00:00:00+00:00</updated><author><name>Alice Heaton</name></author><id>tag:aliceh75.github.io,2018-12-11:/measuring-delay-when-using-webview-with-go.html</id><summary type="html">&lt;p&gt;Serge Zaitsev's &lt;a href="https://github.com/zserge/webview"&gt;webview&lt;/a&gt; library allows us to use a native browser webview in applications written in &lt;a href="https://golang.org/"&gt;the Go programming language&lt;/a&gt;. Amongst other things it allows us to invoke Go methods from the webview's Javascript code, and I wanted to measure how much delay that would introduce.&lt;/p&gt;</summary><content type="html">&lt;h2&gt;Introduction&lt;/h2&gt;
+&lt;p&gt;Serge Zaitsev's &lt;a href="https://github.com/zserge/webview"&gt;webview&lt;/a&gt; library allows us to use a native browser webview in applications written in &lt;a href="https://golang.org/"&gt;the Go programming language&lt;/a&gt;. Amongst other things it allows us to invoke Go methods from the webview's Javascript code, and I wanted to measure how much delay that would introduce.&lt;/p&gt;
+&lt;p&gt;These tests were done using Go 1.11.2 and webview v0.0.0-20181018084947-f390a2df9ec5, running on a amd64 Linux system, and webview used Webkit 605.1.15. These tests are not meant to be comparative, or about absolute performance. Rather I wanted an idea of the order of magnitude of the delays introduced, to inform architectural decisions on building a Go application with webview.&lt;/p&gt;
+&lt;p&gt;The impatient may jump to the &lt;a href="#conclusion"&gt;conclusion&lt;/a&gt;.&lt;/p&gt;
+&lt;h2&gt;The basic test&lt;/h2&gt;
+&lt;p&gt;I created a simple page with two buttons: one called "Go" which would invoke a Go method to change the value of a variable, and one called "Js" which would change the value of the variable directly.&lt;/p&gt;
+&lt;p&gt;I then used a &lt;a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Proxy"&gt;Proxy&lt;/a&gt; object to watch the variable, and measure the time between the button click and the time the variable was changed. The fact I used a Proxy object meant I could not use webview's &lt;a href="https://github.com/zserge/webview#how-to-communicate-between-native-go-and-web-ui"&gt;Bind&lt;/a&gt; method to share data between Go and the webview. When using Bind, webview will rewrite the whole object on change, deleting any Proxy objects you may have inserted in Javascript. So Instead I used Go to run a line of Javascript to change the variable's value.&lt;/p&gt;
+&lt;p&gt;Here is the Go code. Two things to note:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;The &lt;code&gt;Eval&lt;/code&gt; method runs in the browser the string it was given. This is enough functionality to have a back-and-forth between the browser and Go and measure the time it takes;&lt;/li&gt;
+&lt;li&gt;I've used  &lt;a href="https://github.com/go-bindata/go-bindata"&gt;go-bindata&lt;/a&gt; to package the Js in the Go binary&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;br/&gt;&lt;/p&gt;
+&lt;div class="highlight"&gt;&lt;pre&gt;&lt;span&gt;&lt;/span&gt;&lt;span class="kn"&gt;package&lt;/span&gt; &lt;span class="nx"&gt;main&lt;/span&gt;
+
+&lt;span class="kn"&gt;import&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;
+    &lt;span class="s"&gt;&amp;quot;github.com/zserge/webview&amp;quot;&lt;/span&gt;
+&lt;span class="p"&gt;)&lt;/span&gt;
+
+&lt;span class="kd"&gt;var&lt;/span&gt; &lt;span class="nx"&gt;view&lt;/span&gt; &lt;span class="nx"&gt;webview&lt;/span&gt;&lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="nx"&gt;WebView&lt;/span&gt;
+&lt;span class="kd"&gt;type&lt;/span&gt; &lt;span class="nx"&gt;RPC&lt;/span&gt; &lt;span class="kd"&gt;struct&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;
+    &lt;span class="nx"&gt;Version&lt;/span&gt; &lt;span class="kt"&gt;string&lt;/span&gt;
+&lt;span class="p"&gt;}&lt;/span&gt;
+
+&lt;span class="kd"&gt;func&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="nx"&gt;rpc&lt;/span&gt; &lt;span class="o"&gt;*&lt;/span&gt;&lt;span class="nx"&gt;RPC&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt; &lt;span class="nx"&gt;Eval&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="nx"&gt;js&lt;/span&gt; &lt;span class="kt"&gt;string&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;
+    &lt;span class="nx"&gt;view&lt;/span&gt;&lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="nx"&gt;Eval&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="nx"&gt;js&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+&lt;span class="p"&gt;}&lt;/span&gt;
+
+&lt;span class="kd"&gt;func&lt;/span&gt; &lt;span class="nx"&gt;main&lt;/span&gt;&lt;span class="p"&gt;()&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;
+    &lt;span class="nx"&gt;view&lt;/span&gt; &lt;span class="p"&gt;=&lt;/span&gt; &lt;span class="nx"&gt;webview&lt;/span&gt;&lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="nx"&gt;New&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="nx"&gt;webview&lt;/span&gt;&lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="nx"&gt;Settings&lt;/span&gt;&lt;span class="p"&gt;{&lt;/span&gt;
+        &lt;span class="nx"&gt;Title&lt;/span&gt;&lt;span class="p"&gt;:&lt;/span&gt; &lt;span class="s"&gt;&amp;quot;GoWebViewPerf&amp;quot;&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt;
+        &lt;span class="nx"&gt;Debug&lt;/span&gt;&lt;span class="p"&gt;:&lt;/span&gt; &lt;span class="kc"&gt;true&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt;
+    &lt;span class="p"&gt;})&lt;/span&gt;
+    &lt;span class="k"&gt;defer&lt;/span&gt; &lt;span class="nx"&gt;view&lt;/span&gt;&lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="nx"&gt;Exit&lt;/span&gt;&lt;span class="p"&gt;()&lt;/span&gt;
+
+    &lt;span class="nx"&gt;rpc&lt;/span&gt; &lt;span class="o"&gt;:=&lt;/span&gt; &lt;span class="nx"&gt;RPC&lt;/span&gt;&lt;span class="p"&gt;{&lt;/span&gt;&lt;span class="s"&gt;&amp;quot;0.0.1&amp;quot;&lt;/span&gt;&lt;span class="p"&gt;}&lt;/span&gt;
+
+    &lt;span class="nx"&gt;view&lt;/span&gt;&lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="nx"&gt;Dispatch&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="kd"&gt;func&lt;/span&gt;&lt;span class="p"&gt;()&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;
+        &lt;span class="nx"&gt;view&lt;/span&gt;&lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="nx"&gt;Bind&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="s"&gt;&amp;quot;Remote&amp;quot;&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="o"&gt;&amp;amp;&lt;/span&gt;&lt;span class="nx"&gt;rpc&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+        &lt;span class="nx"&gt;view&lt;/span&gt;&lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="nx"&gt;Eval&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="nb"&gt;string&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="nx"&gt;MustAsset&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="s"&gt;&amp;quot;gowebviewperf.js&amp;quot;&lt;/span&gt;&lt;span class="p"&gt;)))&lt;/span&gt;
+    &lt;span class="p"&gt;})&lt;/span&gt;
+    &lt;span class="nx"&gt;view&lt;/span&gt;&lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="nx"&gt;Run&lt;/span&gt;&lt;span class="p"&gt;()&lt;/span&gt;
+&lt;span class="p"&gt;}&lt;/span&gt;
+&lt;/pre&gt;&lt;/div&gt;
+
+
+&lt;p&gt;And here is the Javascript code. It creates two buttons which change the value of an object's property (to a random string), and uses Proxy to watch when the change is effected. The code measures the delay in two ways: the time taken in milliseconds and the number of ticks (Javascript render loops) elapsed. &lt;/p&gt;
+&lt;div class="highlight"&gt;&lt;pre&gt;&lt;span&gt;&lt;/span&gt;&lt;span class="c1"&gt;// Root element&lt;/span&gt;
+&lt;span class="kd"&gt;var&lt;/span&gt; &lt;span class="nx"&gt;app&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="nb"&gt;document&lt;/span&gt;&lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="nx"&gt;querySelector&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="s1"&gt;&amp;#39;#app&amp;#39;&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt;
+
+&lt;span class="c1"&gt;// data&lt;/span&gt;
+&lt;span class="kd"&gt;var&lt;/span&gt; &lt;span class="nx"&gt;data&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;&lt;span class="nx"&gt;value&lt;/span&gt;&lt;span class="o"&gt;:&lt;/span&gt; &lt;span class="s2"&gt;&amp;quot;&amp;quot;&lt;/span&gt;&lt;span class="p"&gt;};&lt;/span&gt;
+
+&lt;span class="c1"&gt;// Counters&lt;/span&gt;
+&lt;span class="kd"&gt;var&lt;/span&gt; &lt;span class="nx"&gt;clickTime&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="kc"&gt;null&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+&lt;span class="kd"&gt;var&lt;/span&gt; &lt;span class="nx"&gt;clickTick&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="mi"&gt;0&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+&lt;span class="kd"&gt;var&lt;/span&gt; &lt;span class="nx"&gt;currentTick&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="mi"&gt;0&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+
+&lt;span class="c1"&gt;// Start counting on click&lt;/span&gt;
+&lt;span class="kd"&gt;function&lt;/span&gt; &lt;span class="nx"&gt;startClick&lt;/span&gt;&lt;span class="p"&gt;()&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;
+  &lt;span class="nx"&gt;clickTime&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="nx"&gt;performance&lt;/span&gt;&lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="nx"&gt;now&lt;/span&gt;&lt;span class="p"&gt;();&lt;/span&gt;
+  &lt;span class="nx"&gt;clickTick&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="nx"&gt;currentTick&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+&lt;span class="p"&gt;}&lt;/span&gt;
+
+&lt;span class="c1"&gt;// Report elapsed time on change&lt;/span&gt;
+&lt;span class="kd"&gt;function&lt;/span&gt; &lt;span class="nx"&gt;reportTime&lt;/span&gt;&lt;span class="p"&gt;()&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;
+  &lt;span class="kd"&gt;var&lt;/span&gt; &lt;span class="nx"&gt;timeDiff&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="nx"&gt;performance&lt;/span&gt;&lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="nx"&gt;now&lt;/span&gt;&lt;span class="p"&gt;()&lt;/span&gt; &lt;span class="o"&gt;-&lt;/span&gt; &lt;span class="nx"&gt;clickTime&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+  &lt;span class="kd"&gt;var&lt;/span&gt; &lt;span class="nx"&gt;tickDiff&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="nx"&gt;currentTick&lt;/span&gt; &lt;span class="o"&gt;-&lt;/span&gt; &lt;span class="nx"&gt;clickTick&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+
+  &lt;span class="nx"&gt;console&lt;/span&gt;&lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="nx"&gt;log&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="s1"&gt;&amp;#39;timeDiff&amp;#39;&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="nx"&gt;timeDiff&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt;
+  &lt;span class="nx"&gt;console&lt;/span&gt;&lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="nx"&gt;log&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="s1"&gt;&amp;#39;tickDiff&amp;#39;&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="nx"&gt;tickDiff&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt;
+&lt;span class="p"&gt;}&lt;/span&gt;
+
+&lt;span class="c1"&gt;// Create the button that will use Go to modify a value&lt;/span&gt;
+&lt;span class="kd"&gt;var&lt;/span&gt; &lt;span class="nx"&gt;goButton&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="nb"&gt;document&lt;/span&gt;&lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="nx"&gt;createElement&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="s1"&gt;&amp;#39;button&amp;#39;&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt;
+&lt;span class="nx"&gt;goButton&lt;/span&gt;&lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="nx"&gt;appendChild&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="nb"&gt;document&lt;/span&gt;&lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="nx"&gt;createTextNode&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="s2"&gt;&amp;quot;Go&amp;quot;&lt;/span&gt;&lt;span class="p"&gt;));&lt;/span&gt;
+&lt;span class="nx"&gt;goButton&lt;/span&gt;&lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="nx"&gt;onclick&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="kd"&gt;function&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="nx"&gt;e&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;
+  &lt;span class="nx"&gt;startClick&lt;/span&gt;&lt;span class="p"&gt;();&lt;/span&gt;
+  &lt;span class="nx"&gt;Remote&lt;/span&gt;&lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="nb"&gt;eval&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="s1"&gt;&amp;#39;data.value = Math.random().toString();&amp;#39;&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt;
+&lt;span class="p"&gt;}&lt;/span&gt;
+&lt;span class="nx"&gt;app&lt;/span&gt;&lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="nx"&gt;appendChild&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="nx"&gt;goButton&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt;
+
+&lt;span class="c1"&gt;// Create the button that will use JS to modify the value&lt;/span&gt;
+&lt;span class="kd"&gt;var&lt;/span&gt; &lt;span class="nx"&gt;jsButton&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="nb"&gt;document&lt;/span&gt;&lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="nx"&gt;createElement&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="s1"&gt;&amp;#39;button&amp;#39;&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt;
+&lt;span class="nx"&gt;jsButton&lt;/span&gt;&lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="nx"&gt;appendChild&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="nb"&gt;document&lt;/span&gt;&lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="nx"&gt;createTextNode&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="s2"&gt;&amp;quot;Js&amp;quot;&lt;/span&gt;&lt;span class="p"&gt;));&lt;/span&gt;
+&lt;span class="nx"&gt;jsButton&lt;/span&gt;&lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="nx"&gt;onclick&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="kd"&gt;function&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="nx"&gt;e&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;
+  &lt;span class="nx"&gt;startClick&lt;/span&gt;&lt;span class="p"&gt;();&lt;/span&gt;
+  &lt;span class="nx"&gt;data&lt;/span&gt;&lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="nx"&gt;value&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="nb"&gt;Math&lt;/span&gt;&lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="nx"&gt;random&lt;/span&gt;&lt;span class="p"&gt;().&lt;/span&gt;&lt;span class="nx"&gt;toString&lt;/span&gt;&lt;span class="p"&gt;();&lt;/span&gt;
+&lt;span class="p"&gt;}&lt;/span&gt;
+&lt;span class="nx"&gt;app&lt;/span&gt;&lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="nx"&gt;appendChild&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="nx"&gt;jsButton&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt;
+
+&lt;span class="c1"&gt;// Watch change in variable&lt;/span&gt;
+&lt;span class="nx"&gt;data&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="k"&gt;new&lt;/span&gt; &lt;span class="nb"&gt;Proxy&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="nx"&gt;data&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;
+  &lt;span class="nx"&gt;set&lt;/span&gt;&lt;span class="o"&gt;:&lt;/span&gt; &lt;span class="kd"&gt;function&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="nx"&gt;target&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="nx"&gt;key&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="nx"&gt;value&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;
+      &lt;span class="nx"&gt;target&lt;/span&gt;&lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="nx"&gt;key&lt;/span&gt;&lt;span class="p"&gt;]&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="nx"&gt;value&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+      &lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="nx"&gt;key&lt;/span&gt; &lt;span class="o"&gt;===&lt;/span&gt; &lt;span class="s1"&gt;&amp;#39;value&amp;#39;&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;
+        &lt;span class="nx"&gt;reportTime&lt;/span&gt;&lt;span class="p"&gt;();&lt;/span&gt;
+      &lt;span class="p"&gt;}&lt;/span&gt;
+  &lt;span class="p"&gt;}&lt;/span&gt;
+&lt;span class="p"&gt;});&lt;/span&gt;
+
+&lt;span class="c1"&gt;// Count ticks&lt;/span&gt;
+&lt;span class="kd"&gt;function&lt;/span&gt; &lt;span class="nx"&gt;tickIncrement&lt;/span&gt;&lt;span class="p"&gt;()&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt; 
+  &lt;span class="nx"&gt;currentTick&lt;/span&gt;&lt;span class="o"&gt;++&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+  &lt;span class="nb"&gt;window&lt;/span&gt;&lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="nx"&gt;setTimeout&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="nx"&gt;tickIncrement&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="mi"&gt;0&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt;
+&lt;span class="p"&gt;}&lt;/span&gt;
+&lt;span class="nx"&gt;tickIncrement&lt;/span&gt;&lt;span class="p"&gt;();&lt;/span&gt;
+&lt;/pre&gt;&lt;/div&gt;
+
+
+&lt;p&gt;As expected the Javascript version was instant - the Go version took one tick (always), and between 3 and 6 milliseconds:&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;&lt;/th&gt;
+&lt;th&gt;Js&lt;/th&gt;
+&lt;th&gt;Go&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;Milliseconds&lt;/td&gt;
+&lt;td&gt;0&lt;/td&gt;
+&lt;td&gt;3 to 6&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Ticks&lt;/td&gt;
+&lt;td&gt;0&lt;/td&gt;
+&lt;td&gt;1&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;h2&gt;Test with some work happening in the Javascript loop&lt;/h2&gt;
+&lt;p&gt;Next I was wondering how the results would be affected if the Javascript also did some work on every tick. I updated the code of &lt;code&gt;tickIncrement&lt;/code&gt; so that it would delete and create a 100 DOM elements every tick:&lt;/p&gt;
+&lt;div class="highlight"&gt;&lt;pre&gt;&lt;span&gt;&lt;/span&gt;&lt;span class="kd"&gt;function&lt;/span&gt; &lt;span class="nx"&gt;tickIncrement&lt;/span&gt;&lt;span class="p"&gt;()&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;
+  &lt;span class="kd"&gt;var&lt;/span&gt; &lt;span class="nx"&gt;i&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+  &lt;span class="kd"&gt;var&lt;/span&gt; &lt;span class="nx"&gt;prev_iteration&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="nx"&gt;currentTick&lt;/span&gt; &lt;span class="o"&gt;%&lt;/span&gt; &lt;span class="mi"&gt;2&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+  &lt;span class="kd"&gt;var&lt;/span&gt; &lt;span class="nx"&gt;next_iteration&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="nx"&gt;currentTick&lt;/span&gt; &lt;span class="o"&gt;+&lt;/span&gt; &lt;span class="mi"&gt;1&lt;/span&gt; &lt;span class="p"&gt;)&lt;/span&gt; &lt;span class="o"&gt;%&lt;/span&gt; &lt;span class="mi"&gt;2&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+
+  &lt;span class="c1"&gt;// Remove old elements&lt;/span&gt;
+  &lt;span class="kd"&gt;var&lt;/span&gt; &lt;span class="nx"&gt;old_elements&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="nb"&gt;document&lt;/span&gt;&lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="nx"&gt;getElementsByClassName&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="s1"&gt;&amp;#39;addrem_&amp;#39;&lt;/span&gt; &lt;span class="o"&gt;+&lt;/span&gt; &lt;span class="nx"&gt;prev_iteration&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt;
+  &lt;span class="k"&gt;for&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="nx"&gt;i&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="mi"&gt;0&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt; &lt;span class="nx"&gt;i&lt;/span&gt; &lt;span class="o"&gt;&amp;lt;&lt;/span&gt; &lt;span class="nx"&gt;old_elements&lt;/span&gt;&lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="nx"&gt;length&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt; &lt;span class="nx"&gt;i&lt;/span&gt;&lt;span class="o"&gt;++&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;
+    &lt;span class="nx"&gt;old_elements&lt;/span&gt;&lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="nx"&gt;i&lt;/span&gt;&lt;span class="p"&gt;].&lt;/span&gt;&lt;span class="nx"&gt;parentNode&lt;/span&gt;&lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="nx"&gt;removeChild&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="nx"&gt;old_elements&lt;/span&gt;&lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="nx"&gt;i&lt;/span&gt;&lt;span class="p"&gt;]);&lt;/span&gt;
+  &lt;span class="p"&gt;}&lt;/span&gt;
+  &lt;span class="c1"&gt;// Add new elements&lt;/span&gt;
+  &lt;span class="k"&gt;for&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="nx"&gt;i&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="mi"&gt;0&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt; &lt;span class="nx"&gt;i&lt;/span&gt; &lt;span class="o"&gt;&amp;lt;&lt;/span&gt; &lt;span class="mi"&gt;100&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt; &lt;span class="nx"&gt;i&lt;/span&gt;&lt;span class="o"&gt;++&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;
+    &lt;span class="kd"&gt;var&lt;/span&gt; &lt;span class="nx"&gt;new_element&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="nb"&gt;document&lt;/span&gt;&lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="nx"&gt;createElement&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="s1"&gt;&amp;#39;div&amp;#39;&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt;
+    &lt;span class="nx"&gt;new_element&lt;/span&gt;&lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="nx"&gt;classList&lt;/span&gt;&lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="nx"&gt;add&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="s1"&gt;&amp;#39;addrem_&amp;#39;&lt;/span&gt; &lt;span class="o"&gt;+&lt;/span&gt; &lt;span class="nx"&gt;next_iteration&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt;
+    &lt;span class="nx"&gt;new_element&lt;/span&gt;&lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="nx"&gt;appendChild&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="nb"&gt;document&lt;/span&gt;&lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="nx"&gt;createTextNode&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="s2"&gt;&amp;quot;hello &amp;quot;&lt;/span&gt; &lt;span class="o"&gt;+&lt;/span&gt; &lt;span class="nx"&gt;next_iteration&lt;/span&gt; &lt;span class="o"&gt;+&lt;/span&gt; &lt;span class="s2"&gt;&amp;quot; &amp;quot;&lt;/span&gt; &lt;span class="o"&gt;+&lt;/span&gt; &lt;span class="nx"&gt;i&lt;/span&gt;&lt;span class="p"&gt;));&lt;/span&gt;
+    &lt;span class="nx"&gt;app&lt;/span&gt;&lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="nx"&gt;appendChild&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="nx"&gt;new_element&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt;
+  &lt;span class="p"&gt;}&lt;/span&gt;
+
+  &lt;span class="nx"&gt;currentTick&lt;/span&gt;&lt;span class="o"&gt;++&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+  &lt;span class="nb"&gt;window&lt;/span&gt;&lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="nx"&gt;setTimeout&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="nx"&gt;tickIncrement&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="mi"&gt;0&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt;
+&lt;span class="p"&gt;}&lt;/span&gt;
+&lt;/pre&gt;&lt;/div&gt;
+
+
+&lt;p&gt;The Javascript, as expected, was still instant. The Go version still took one tick, but the time spent was now between 7 and 8 milliseconds.&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;&lt;/th&gt;
+&lt;th&gt;Js&lt;/th&gt;
+&lt;th&gt;Go&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;Milliseconds&lt;/td&gt;
+&lt;td&gt;0&lt;/td&gt;
+&lt;td&gt;7 to 9&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Ticks&lt;/td&gt;
+&lt;td&gt;0&lt;/td&gt;
+&lt;td&gt;1&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;What this shows is that it does not matter how long one tick takes - the process of calling a Go method, and having the Go method change a variable in the Javascript (by executing Javascript code) will always take one tick.&lt;/p&gt;
+&lt;h2&gt;Test with some work happening in the Go callback&lt;/h2&gt;
+&lt;p&gt;I also wanted to see how work happening in the Go callback would affect things. I rewrote &lt;code&gt;RPC.Eval&lt;/code&gt; to include a small pause:&lt;/p&gt;
+&lt;div class="highlight"&gt;&lt;pre&gt;&lt;span&gt;&lt;/span&gt;&lt;span class="kd"&gt;func&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="nx"&gt;rpc&lt;/span&gt; &lt;span class="o"&gt;*&lt;/span&gt;&lt;span class="nx"&gt;RPC&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt; &lt;span class="nx"&gt;Eval&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="nx"&gt;js&lt;/span&gt; &lt;span class="kt"&gt;string&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;
+    &lt;span class="nx"&gt;time&lt;/span&gt;&lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="nx"&gt;Sleep&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="mi"&gt;5&lt;/span&gt; &lt;span class="o"&gt;*&lt;/span&gt; &lt;span class="mi"&gt;1000000&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+    &lt;span class="nx"&gt;view&lt;/span&gt;&lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="nx"&gt;Eval&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="nx"&gt;js&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+&lt;span class="p"&gt;}&lt;/span&gt;
+&lt;/pre&gt;&lt;/div&gt;
+
+
+&lt;p&gt;This did not, of course, change anything to the Javascript implementation. The Go implementation now took between 10 and 12 milliseconds, and two 2 ticks. The number of ticks is dependent on the time spent - if I increase the length of the pause, more ticks go by.&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;&lt;/th&gt;
+&lt;th&gt;Js&lt;/th&gt;
+&lt;th&gt;Go&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;Milliseconds&lt;/td&gt;
+&lt;td&gt;0&lt;/td&gt;
+&lt;td&gt;10 to 12&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Ticks&lt;/td&gt;
+&lt;td&gt;0&lt;/td&gt;
+&lt;td&gt;2&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;What this shows is that while the Go invocation is dependent on the length of the tick, the Javascript loop is not delayed by Go.&lt;/p&gt;
+&lt;h2&gt;Test with some work happening both sides&lt;/h2&gt;
+&lt;p&gt;If I now combine the two tests - work happening on the Javascript side and on the Go side - I see the time go up, but the number of ticks go down:&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;&lt;/th&gt;
+&lt;th&gt;Js&lt;/th&gt;
+&lt;th&gt;Go&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;Milliseconds&lt;/td&gt;
+&lt;td&gt;0&lt;/td&gt;
+&lt;td&gt;13 to 15&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Ticks&lt;/td&gt;
+&lt;td&gt;0&lt;/td&gt;
+&lt;td&gt;1&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;This is as expected - more work is happening on the Go side, but the tick is longer so it only takes one tick.&lt;/p&gt;
+&lt;h2&gt;&lt;a name='conclusion'&gt;&lt;/a&gt; Conclusion&lt;/h2&gt;
+&lt;p&gt;Invoking a Go method from Javascript, and having that Go method change data (by running code) on the Javascript side always takes at least one tick (Javascript loop) - regardless of how long the tick takes. In my measurements this took at least 3 to 5 milliseconds, though these results are likely to vary. The time taken to run the Go code did not slow down or affect the Javascript loop.&lt;/p&gt;
+&lt;p&gt;When building an application in Go and using webview for the UI, there are broadly three options:&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;Have most of the application logic in Go, while using webview mostly for updating the DOM;&lt;/li&gt;
+&lt;li&gt;Have all the logic related to the user interface in Javascript, and the rest of the application logic in Go;&lt;/li&gt;
+&lt;li&gt;Have most of the application logic in Javascript, while using Go as a thin layer when we need to access the host.&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;The results show that 1. is not a viable option - a user interface must be as responsive as possible, and we should avoid introducing any unnecessary delays. The delay however is sufficiently small that both options 2. and 3. are viable.&lt;/p&gt;</content><category term="go"></category><category term="webview"></category></entry><entry><title>Using modules for workspaces in Go</title><link href="https://aliceh75.github.io/using-modules-for-workspaces-in-golang.html" rel="alternate"></link><published>2018-12-01T00:00:00+00:00</published><updated>2018-12-01T00:00:00+00:00</updated><author><name>Alice Heaton</name></author><id>tag:aliceh75.github.io,2018-12-01:/using-modules-for-workspaces-in-golang.html</id><summary type="html">&lt;p&gt;As of Go 1.11, the Go programming language has (experimental) &lt;a href="https://golang.org/doc/go1.11#modules"&gt;support for modules&lt;/a&gt;. This addresses a number of needs - such as ensuring semantic versioning, ensuring reproducible builds, etc. Here I look specifically at how modules help replace the need for &lt;code&gt;$GOPATH&lt;/code&gt; based workspaces.&lt;/p&gt;</summary><content type="html">&lt;p&gt;As of Go 1.11, the Go programming language has (experimental) &lt;a href="https://golang.org/doc/go1.11#modules"&gt;support for modules&lt;/a&gt;. This addresses a number of needs - such as ensuring semantic versioning, ensuring reproducible builds, etc. Here I look specifically at how modules help replace the need for &lt;code&gt;$GOPATH&lt;/code&gt; based workspaces.&lt;/p&gt;
 &lt;p&gt;In that context a module is simply an isolated collection of packages - as you'd get with a &lt;a href=="https://docs.python.org/3/tutorial/venv.html"&gt;Python virtual environment&lt;/a&gt;.&lt;/p&gt;
-&lt;p&gt;With Go 1.11 you create a module by adding a &lt;code&gt;go.mod&lt;/code&gt; file in a folder outside of your $GOPATH. This file can be created automatically by running &lt;code&gt;go mod init&lt;/code&gt;:&lt;/p&gt;
+&lt;p&gt;With Go 1.11 you create a module by adding a &lt;code&gt;go.mod&lt;/code&gt; file in a folder outside of your &lt;code&gt;$GOPATH&lt;/code&gt;. This file can be created automatically by running &lt;code&gt;go mod init&lt;/code&gt;:&lt;/p&gt;
 &lt;div class="highlight"&gt;&lt;pre&gt;&lt;span&gt;&lt;/span&gt;$ mkdir myexample
 $ &lt;span class="nb"&gt;cd&lt;/span&gt; myexample
 $ go mod init myexample
@@ -36,7 +281,7 @@ $ go mod init myexample
 &lt;/pre&gt;&lt;/div&gt;
 
 
-&lt;p&gt;There is a lot more to modules than enabling workspaces - I suggest you look at the &lt;a href="https://github.com/golang/go/wiki/Modules"&gt;Go Modules Wiki&lt;/a&gt; for more information on modules, in particular how they replace other forms of dependency management.&lt;/p&gt;</content><category term="golang"></category></entry><entry><title>Python asynchronous cooperative mode</title><link href="https://aliceh75.github.io/python-asynchronous-cooperative-mode.html" rel="alternate"></link><published>2018-06-30T00:00:00+01:00</published><updated>2018-06-30T00:00:00+01:00</updated><author><name>Alice Heaton</name></author><id>tag:aliceh75.github.io,2018-06-30:/python-asynchronous-cooperative-mode.html</id><summary type="html">&lt;p&gt;With the addition of &lt;a href="https://docs.python.org/3.5/library/asyncio.html"&gt;asyncio&lt;/a&gt; in the Python 3.4 stdlib and the &lt;a href="https://www.python.org/dev/peps/pep-0492/"&gt;async/await syntax&lt;/a&gt; in Python 3.5, co-operative asynchronous programing is now an official part of Python. The co-operative asynchronous mode is not complicated to use - but the Python ecosystem is a bit confusing at first. Here I give an introduction to asynchronous programing concepts and eco-system in Python.&lt;/p&gt;</summary><content type="html">&lt;p&gt;With the addition of &lt;a href="https://docs.python.org/3.5/library/asyncio.html"&gt;asyncio&lt;/a&gt; in the Python 3.4 stdlib and the &lt;a href="https://www.python.org/dev/peps/pep-0492/"&gt;async/await syntax&lt;/a&gt; in Python 3.5, co-operative asynchronous programing is now an official part of Python. The co-operative asynchronous mode is not complicated to use - but the Python ecosystem is a bit confusing at first. Here I give an introduction to asynchronous programing concepts and eco-system in Python. &lt;/p&gt;
+&lt;p&gt;There is a lot more to modules than enabling workspaces - I suggest you look at the &lt;a href="https://github.com/golang/go/wiki/Modules"&gt;Go Modules Wiki&lt;/a&gt; for more information on modules, in particular how they replace other forms of dependency management.&lt;/p&gt;</content><category term="go"></category></entry><entry><title>Python asynchronous cooperative mode</title><link href="https://aliceh75.github.io/python-asynchronous-cooperative-mode.html" rel="alternate"></link><published>2018-06-30T00:00:00+01:00</published><updated>2018-06-30T00:00:00+01:00</updated><author><name>Alice Heaton</name></author><id>tag:aliceh75.github.io,2018-06-30:/python-asynchronous-cooperative-mode.html</id><summary type="html">&lt;p&gt;With the addition of &lt;a href="https://docs.python.org/3.5/library/asyncio.html"&gt;asyncio&lt;/a&gt; in the Python 3.4 stdlib and the &lt;a href="https://www.python.org/dev/peps/pep-0492/"&gt;async/await syntax&lt;/a&gt; in Python 3.5, co-operative asynchronous programing is now an official part of Python. The co-operative asynchronous mode is not complicated to use - but the Python ecosystem is a bit confusing at first. Here I give an introduction to asynchronous programing concepts and eco-system in Python.&lt;/p&gt;</summary><content type="html">&lt;p&gt;With the addition of &lt;a href="https://docs.python.org/3.5/library/asyncio.html"&gt;asyncio&lt;/a&gt; in the Python 3.4 stdlib and the &lt;a href="https://www.python.org/dev/peps/pep-0492/"&gt;async/await syntax&lt;/a&gt; in Python 3.5, co-operative asynchronous programing is now an official part of Python. The co-operative asynchronous mode is not complicated to use - but the Python ecosystem is a bit confusing at first. Here I give an introduction to asynchronous programing concepts and eco-system in Python. &lt;/p&gt;
 &lt;h2&gt;Definitions&lt;/h2&gt;
 &lt;ul&gt;
 &lt;li&gt;

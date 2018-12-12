@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Alice/Development Notes &mdash; Measuring delay when using webview with Go</title>
+    <meta charset="utf-8"/>
+    <link rel="stylesheet" type="text/css" href="https://aliceh75.github.io/theme/css/style.css"/>
+</head>
+
+<body>
+    <div id="container">
+        <div id="header">
+                <div id="site-title"><a href="https://aliceh75.github.io">Alice/Development Notes</a></div>
+        </div>
+
+        <div id="contents">
+    <div class="post">
+        <div class="entry-meta">
+            <div class="date">Tue 11 December 2018</div>
+            <div class="author">By Alice Heaton</div>
+                <div class="tag-list">
+                        <a href="https://aliceh75.github.io/tag/go" rel="tag">#go</a>
+                        <a href="https://aliceh75.github.io/tag/webview" rel="tag">#webview</a>
+                </div>
+        </div>
+        <div class="entry-main">
+            <h1 class="entry-title">
+                <a href="https://aliceh75.github.io/measuring-delay-when-using-webview-with-go" title="Measuring delay when using webview with Go"
+                   rel="bookmark">Measuring delay when using webview with Go</a>
+            </h1>
+            <div class="entry-content">
+                  <h2>Introduction</h2>
+<p>Serge Zaitsev's <a href="https://github.com/zserge/webview">webview</a> library allows us to use a native browser webview in applications written in <a href="https://golang.org/">the Go programming language</a>. Amongst other things it allows us to invoke Go methods from the webview's Javascript code, and I wanted to measure how much delay that would introduce.</p>
+<p>These tests were done using Go 1.11.2 and webview v0.0.0-20181018084947-f390a2df9ec5, running on a amd64 Linux system, and webview used Webkit 605.1.15. These tests are not meant to be comparative, or about absolute performance. Rather I wanted an idea of the order of magnitude of the delays introduced, to inform architectural decisions on building a Go application with webview.</p>
+<p>The impatient may jump to the <a href="#conclusion">conclusion</a>.</p>
+<h2>The basic test</h2>
+<p>I created a simple page with two buttons: one called "Go" which would invoke a Go method to change the value of a variable, and one called "Js" which would change the value of the variable directly.</p>
+<p>I then used a <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Proxy">Proxy</a> object to watch the variable, and measure the time between the button click and the time the variable was changed. The fact I used a Proxy object meant I could not use webview's <a href="https://github.com/zserge/webview#how-to-communicate-between-native-go-and-web-ui">Bind</a> method to share data between Go and the webview. When using Bind, webview will rewrite the whole object on change, deleting any Proxy objects you may have inserted in Javascript. So Instead I used Go to run a line of Javascript to change the variable's value.</p>
+<p>Here is the Go code. Two things to note:</p>
+<ul>
+<li>The <code>Eval</code> method runs in the browser the string it was given. This is enough functionality to have a back-and-forth between the browser and Go and measure the time it takes;</li>
+<li>I've used  <a href="https://github.com/go-bindata/go-bindata">go-bindata</a> to package the Js in the Go binary</li>
+</ul>
+<p><br/></p>
+<div class="highlight"><pre><span></span><span class="kn">package</span> <span class="nx">main</span>
+
+<span class="kn">import</span> <span class="p">(</span>
+    <span class="s">&quot;github.com/zserge/webview&quot;</span>
+<span class="p">)</span>
+
+<span class="kd">var</span> <span class="nx">view</span> <span class="nx">webview</span><span class="p">.</span><span class="nx">WebView</span>
+<span class="kd">type</span> <span class="nx">RPC</span> <span class="kd">struct</span> <span class="p">{</span>
+    <span class="nx">Version</span> <span class="kt">string</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="p">(</span><span class="nx">rpc</span> <span class="o">*</span><span class="nx">RPC</span><span class="p">)</span> <span class="nx">Eval</span><span class="p">(</span><span class="nx">js</span> <span class="kt">string</span><span class="p">)</span> <span class="p">{</span>
+    <span class="nx">view</span><span class="p">.</span><span class="nx">Eval</span><span class="p">(</span><span class="nx">js</span><span class="p">)</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="nx">main</span><span class="p">()</span> <span class="p">{</span>
+    <span class="nx">view</span> <span class="p">=</span> <span class="nx">webview</span><span class="p">.</span><span class="nx">New</span><span class="p">(</span><span class="nx">webview</span><span class="p">.</span><span class="nx">Settings</span><span class="p">{</span>
+        <span class="nx">Title</span><span class="p">:</span> <span class="s">&quot;GoWebViewPerf&quot;</span><span class="p">,</span>
+        <span class="nx">Debug</span><span class="p">:</span> <span class="kc">true</span><span class="p">,</span>
+    <span class="p">})</span>
+    <span class="k">defer</span> <span class="nx">view</span><span class="p">.</span><span class="nx">Exit</span><span class="p">()</span>
+
+    <span class="nx">rpc</span> <span class="o">:=</span> <span class="nx">RPC</span><span class="p">{</span><span class="s">&quot;0.0.1&quot;</span><span class="p">}</span>
+
+    <span class="nx">view</span><span class="p">.</span><span class="nx">Dispatch</span><span class="p">(</span><span class="kd">func</span><span class="p">()</span> <span class="p">{</span>
+        <span class="nx">view</span><span class="p">.</span><span class="nx">Bind</span><span class="p">(</span><span class="s">&quot;Remote&quot;</span><span class="p">,</span> <span class="o">&amp;</span><span class="nx">rpc</span><span class="p">)</span>
+        <span class="nx">view</span><span class="p">.</span><span class="nx">Eval</span><span class="p">(</span><span class="nb">string</span><span class="p">(</span><span class="nx">MustAsset</span><span class="p">(</span><span class="s">&quot;gowebviewperf.js&quot;</span><span class="p">)))</span>
+    <span class="p">})</span>
+    <span class="nx">view</span><span class="p">.</span><span class="nx">Run</span><span class="p">()</span>
+<span class="p">}</span>
+</pre></div>
+
+
+<p>And here is the Javascript code. It creates two buttons which change the value of an object's property (to a random string), and uses Proxy to watch when the change is effected. The code measures the delay in two ways: the time taken in milliseconds and the number of ticks (Javascript render loops) elapsed. </p>
+<div class="highlight"><pre><span></span><span class="c1">// Root element</span>
+<span class="kd">var</span> <span class="nx">app</span> <span class="o">=</span> <span class="nb">document</span><span class="p">.</span><span class="nx">querySelector</span><span class="p">(</span><span class="s1">&#39;#app&#39;</span><span class="p">);</span>
+
+<span class="c1">// data</span>
+<span class="kd">var</span> <span class="nx">data</span> <span class="o">=</span> <span class="p">{</span><span class="nx">value</span><span class="o">:</span> <span class="s2">&quot;&quot;</span><span class="p">};</span>
+
+<span class="c1">// Counters</span>
+<span class="kd">var</span> <span class="nx">clickTime</span> <span class="o">=</span> <span class="kc">null</span><span class="p">;</span>
+<span class="kd">var</span> <span class="nx">clickTick</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+<span class="kd">var</span> <span class="nx">currentTick</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+
+<span class="c1">// Start counting on click</span>
+<span class="kd">function</span> <span class="nx">startClick</span><span class="p">()</span> <span class="p">{</span>
+  <span class="nx">clickTime</span> <span class="o">=</span> <span class="nx">performance</span><span class="p">.</span><span class="nx">now</span><span class="p">();</span>
+  <span class="nx">clickTick</span> <span class="o">=</span> <span class="nx">currentTick</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="c1">// Report elapsed time on change</span>
+<span class="kd">function</span> <span class="nx">reportTime</span><span class="p">()</span> <span class="p">{</span>
+  <span class="kd">var</span> <span class="nx">timeDiff</span> <span class="o">=</span> <span class="nx">performance</span><span class="p">.</span><span class="nx">now</span><span class="p">()</span> <span class="o">-</span> <span class="nx">clickTime</span><span class="p">;</span>
+  <span class="kd">var</span> <span class="nx">tickDiff</span> <span class="o">=</span> <span class="nx">currentTick</span> <span class="o">-</span> <span class="nx">clickTick</span><span class="p">;</span>
+
+  <span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="s1">&#39;timeDiff&#39;</span><span class="p">,</span> <span class="nx">timeDiff</span><span class="p">);</span>
+  <span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="s1">&#39;tickDiff&#39;</span><span class="p">,</span> <span class="nx">tickDiff</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="c1">// Create the button that will use Go to modify a value</span>
+<span class="kd">var</span> <span class="nx">goButton</span> <span class="o">=</span> <span class="nb">document</span><span class="p">.</span><span class="nx">createElement</span><span class="p">(</span><span class="s1">&#39;button&#39;</span><span class="p">);</span>
+<span class="nx">goButton</span><span class="p">.</span><span class="nx">appendChild</span><span class="p">(</span><span class="nb">document</span><span class="p">.</span><span class="nx">createTextNode</span><span class="p">(</span><span class="s2">&quot;Go&quot;</span><span class="p">));</span>
+<span class="nx">goButton</span><span class="p">.</span><span class="nx">onclick</span> <span class="o">=</span> <span class="kd">function</span> <span class="p">(</span><span class="nx">e</span><span class="p">)</span> <span class="p">{</span>
+  <span class="nx">startClick</span><span class="p">();</span>
+  <span class="nx">Remote</span><span class="p">.</span><span class="nb">eval</span><span class="p">(</span><span class="s1">&#39;data.value = Math.random().toString();&#39;</span><span class="p">);</span>
+<span class="p">}</span>
+<span class="nx">app</span><span class="p">.</span><span class="nx">appendChild</span><span class="p">(</span><span class="nx">goButton</span><span class="p">);</span>
+
+<span class="c1">// Create the button that will use JS to modify the value</span>
+<span class="kd">var</span> <span class="nx">jsButton</span> <span class="o">=</span> <span class="nb">document</span><span class="p">.</span><span class="nx">createElement</span><span class="p">(</span><span class="s1">&#39;button&#39;</span><span class="p">);</span>
+<span class="nx">jsButton</span><span class="p">.</span><span class="nx">appendChild</span><span class="p">(</span><span class="nb">document</span><span class="p">.</span><span class="nx">createTextNode</span><span class="p">(</span><span class="s2">&quot;Js&quot;</span><span class="p">));</span>
+<span class="nx">jsButton</span><span class="p">.</span><span class="nx">onclick</span> <span class="o">=</span> <span class="kd">function</span><span class="p">(</span><span class="nx">e</span><span class="p">)</span> <span class="p">{</span>
+  <span class="nx">startClick</span><span class="p">();</span>
+  <span class="nx">data</span><span class="p">.</span><span class="nx">value</span> <span class="o">=</span> <span class="nb">Math</span><span class="p">.</span><span class="nx">random</span><span class="p">().</span><span class="nx">toString</span><span class="p">();</span>
+<span class="p">}</span>
+<span class="nx">app</span><span class="p">.</span><span class="nx">appendChild</span><span class="p">(</span><span class="nx">jsButton</span><span class="p">);</span>
+
+<span class="c1">// Watch change in variable</span>
+<span class="nx">data</span> <span class="o">=</span> <span class="k">new</span> <span class="nb">Proxy</span><span class="p">(</span><span class="nx">data</span><span class="p">,</span> <span class="p">{</span>
+  <span class="nx">set</span><span class="o">:</span> <span class="kd">function</span> <span class="p">(</span><span class="nx">target</span><span class="p">,</span> <span class="nx">key</span><span class="p">,</span> <span class="nx">value</span><span class="p">)</span> <span class="p">{</span>
+      <span class="nx">target</span><span class="p">[</span><span class="nx">key</span><span class="p">]</span> <span class="o">=</span> <span class="nx">value</span><span class="p">;</span>
+      <span class="k">if</span> <span class="p">(</span><span class="nx">key</span> <span class="o">===</span> <span class="s1">&#39;value&#39;</span><span class="p">)</span> <span class="p">{</span>
+        <span class="nx">reportTime</span><span class="p">();</span>
+      <span class="p">}</span>
+  <span class="p">}</span>
+<span class="p">});</span>
+
+<span class="c1">// Count ticks</span>
+<span class="kd">function</span> <span class="nx">tickIncrement</span><span class="p">()</span> <span class="p">{</span> 
+  <span class="nx">currentTick</span><span class="o">++</span><span class="p">;</span>
+  <span class="nb">window</span><span class="p">.</span><span class="nx">setTimeout</span><span class="p">(</span><span class="nx">tickIncrement</span><span class="p">,</span> <span class="mi">0</span><span class="p">);</span>
+<span class="p">}</span>
+<span class="nx">tickIncrement</span><span class="p">();</span>
+</pre></div>
+
+
+<p>As expected the Javascript version was instant - the Go version took one tick (always), and between 3 and 6 milliseconds:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Js</th>
+<th>Go</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Milliseconds</td>
+<td>0</td>
+<td>3 to 6</td>
+</tr>
+<tr>
+<td>Ticks</td>
+<td>0</td>
+<td>1</td>
+</tr>
+</tbody>
+</table>
+<h2>Test with some work happening in the Javascript loop</h2>
+<p>Next I was wondering how the results would be affected if the Javascript also did some work on every tick. I updated the code of <code>tickIncrement</code> so that it would delete and create a 100 DOM elements every tick:</p>
+<div class="highlight"><pre><span></span><span class="kd">function</span> <span class="nx">tickIncrement</span><span class="p">()</span> <span class="p">{</span>
+  <span class="kd">var</span> <span class="nx">i</span><span class="p">;</span>
+  <span class="kd">var</span> <span class="nx">prev_iteration</span> <span class="o">=</span> <span class="nx">currentTick</span> <span class="o">%</span> <span class="mi">2</span><span class="p">;</span>
+  <span class="kd">var</span> <span class="nx">next_iteration</span> <span class="o">=</span> <span class="p">(</span><span class="nx">currentTick</span> <span class="o">+</span> <span class="mi">1</span> <span class="p">)</span> <span class="o">%</span> <span class="mi">2</span><span class="p">;</span>
+
+  <span class="c1">// Remove old elements</span>
+  <span class="kd">var</span> <span class="nx">old_elements</span> <span class="o">=</span> <span class="nb">document</span><span class="p">.</span><span class="nx">getElementsByClassName</span><span class="p">(</span><span class="s1">&#39;addrem_&#39;</span> <span class="o">+</span> <span class="nx">prev_iteration</span><span class="p">);</span>
+  <span class="k">for</span> <span class="p">(</span><span class="nx">i</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="nx">i</span> <span class="o">&lt;</span> <span class="nx">old_elements</span><span class="p">.</span><span class="nx">length</span><span class="p">;</span> <span class="nx">i</span><span class="o">++</span><span class="p">)</span> <span class="p">{</span>
+    <span class="nx">old_elements</span><span class="p">[</span><span class="nx">i</span><span class="p">].</span><span class="nx">parentNode</span><span class="p">.</span><span class="nx">removeChild</span><span class="p">(</span><span class="nx">old_elements</span><span class="p">[</span><span class="nx">i</span><span class="p">]);</span>
+  <span class="p">}</span>
+  <span class="c1">// Add new elements</span>
+  <span class="k">for</span> <span class="p">(</span><span class="nx">i</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="nx">i</span> <span class="o">&lt;</span> <span class="mi">100</span><span class="p">;</span> <span class="nx">i</span><span class="o">++</span><span class="p">)</span> <span class="p">{</span>
+    <span class="kd">var</span> <span class="nx">new_element</span> <span class="o">=</span> <span class="nb">document</span><span class="p">.</span><span class="nx">createElement</span><span class="p">(</span><span class="s1">&#39;div&#39;</span><span class="p">);</span>
+    <span class="nx">new_element</span><span class="p">.</span><span class="nx">classList</span><span class="p">.</span><span class="nx">add</span><span class="p">(</span><span class="s1">&#39;addrem_&#39;</span> <span class="o">+</span> <span class="nx">next_iteration</span><span class="p">);</span>
+    <span class="nx">new_element</span><span class="p">.</span><span class="nx">appendChild</span><span class="p">(</span><span class="nb">document</span><span class="p">.</span><span class="nx">createTextNode</span><span class="p">(</span><span class="s2">&quot;hello &quot;</span> <span class="o">+</span> <span class="nx">next_iteration</span> <span class="o">+</span> <span class="s2">&quot; &quot;</span> <span class="o">+</span> <span class="nx">i</span><span class="p">));</span>
+    <span class="nx">app</span><span class="p">.</span><span class="nx">appendChild</span><span class="p">(</span><span class="nx">new_element</span><span class="p">);</span>
+  <span class="p">}</span>
+
+  <span class="nx">currentTick</span><span class="o">++</span><span class="p">;</span>
+  <span class="nb">window</span><span class="p">.</span><span class="nx">setTimeout</span><span class="p">(</span><span class="nx">tickIncrement</span><span class="p">,</span> <span class="mi">0</span><span class="p">);</span>
+<span class="p">}</span>
+</pre></div>
+
+
+<p>The Javascript, as expected, was still instant. The Go version still took one tick, but the time spent was now between 7 and 8 milliseconds.</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Js</th>
+<th>Go</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Milliseconds</td>
+<td>0</td>
+<td>7 to 9</td>
+</tr>
+<tr>
+<td>Ticks</td>
+<td>0</td>
+<td>1</td>
+</tr>
+</tbody>
+</table>
+<p>What this shows is that it does not matter how long one tick takes - the process of calling a Go method, and having the Go method change a variable in the Javascript (by executing Javascript code) will always take one tick.</p>
+<h2>Test with some work happening in the Go callback</h2>
+<p>I also wanted to see how work happening in the Go callback would affect things. I rewrote <code>RPC.Eval</code> to include a small pause:</p>
+<div class="highlight"><pre><span></span><span class="kd">func</span> <span class="p">(</span><span class="nx">rpc</span> <span class="o">*</span><span class="nx">RPC</span><span class="p">)</span> <span class="nx">Eval</span><span class="p">(</span><span class="nx">js</span> <span class="kt">string</span><span class="p">)</span> <span class="p">{</span>
+    <span class="nx">time</span><span class="p">.</span><span class="nx">Sleep</span><span class="p">(</span><span class="mi">5</span> <span class="o">*</span> <span class="mi">1000000</span><span class="p">)</span>
+    <span class="nx">view</span><span class="p">.</span><span class="nx">Eval</span><span class="p">(</span><span class="nx">js</span><span class="p">)</span>
+<span class="p">}</span>
+</pre></div>
+
+
+<p>This did not, of course, change anything to the Javascript implementation. The Go implementation now took between 10 and 12 milliseconds, and two 2 ticks. The number of ticks is dependent on the time spent - if I increase the length of the pause, more ticks go by.</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Js</th>
+<th>Go</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Milliseconds</td>
+<td>0</td>
+<td>10 to 12</td>
+</tr>
+<tr>
+<td>Ticks</td>
+<td>0</td>
+<td>2</td>
+</tr>
+</tbody>
+</table>
+<p>What this shows is that while the Go invocation is dependent on the length of the tick, the Javascript loop is not delayed by Go.</p>
+<h2>Test with some work happening both sides</h2>
+<p>If I now combine the two tests - work happening on the Javascript side and on the Go side - I see the time go up, but the number of ticks go down:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Js</th>
+<th>Go</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Milliseconds</td>
+<td>0</td>
+<td>13 to 15</td>
+</tr>
+<tr>
+<td>Ticks</td>
+<td>0</td>
+<td>1</td>
+</tr>
+</tbody>
+</table>
+<p>This is as expected - more work is happening on the Go side, but the tick is longer so it only takes one tick.</p>
+<h2><a name='conclusion'></a> Conclusion</h2>
+<p>Invoking a Go method from Javascript, and having that Go method change data (by running code) on the Javascript side always takes at least one tick (Javascript loop) - regardless of how long the tick takes. In my measurements this took at least 3 to 5 milliseconds, though these results are likely to vary. The time taken to run the Go code did not slow down or affect the Javascript loop.</p>
+<p>When building an application in Go and using webview for the UI, there are broadly three options:</p>
+<ol>
+<li>Have most of the application logic in Go, while using webview mostly for updating the DOM;</li>
+<li>Have all the logic related to the user interface in Javascript, and the rest of the application logic in Go;</li>
+<li>Have most of the application logic in Javascript, while using Go as a thin layer when we need to access the host.</li>
+</ol>
+<p>The results show that 1. is not a viable option - a user interface must be as responsive as possible, and we should avoid introducing any unnecessary delays. The delay however is sufficiently small that both options 2. and 3. are viable.</p>
+            </div>
+        </div>
+    </div>
+        </div>
+
+        <div id="footer">
+            <p>Alice online: <a href="http://github.com/aliceh75">GitHub</a> <a href="https://twitter.com/aliceheaton75">Twitter</a></p>
+            <p>Site generated by <a href="http://pelican.readthedocs.org">Pelican</a>, theme loosely based on <a href="https://github.com/tbunnyman/pelican-chunk">Chunk</a></p>
+            <p>All content by Alice Heaton, licensed under a <a rel="license" href="http://creativecommons.org/licenses/by-sa/4.0/">Creative Commons Attribution-ShareAlike 4.0 International License</a>
+               <a rel="license" href="http://creativecommons.org/licenses/by-sa/4.0/"><img alt="Creative Commons Licence" style="border-width:0" src="http://i.creativecommons.org/l/by-sa/4.0/80x15.png" /></a>
+            </p>
+        </div>
+    </div>
+</body>
+</html>

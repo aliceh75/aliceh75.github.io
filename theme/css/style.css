@@ -144,6 +144,25 @@ div.entry-content .note {
     font-size: 11px;
 }
 
+div.entry-content table {
+    border-collapse: separate;
+    empty-cells: hide;
+}
+
+div.entry-content td, div.entry-content th {
+    padding: 10px;
+    border-left: 1px solid #888;
+    border-top: 1px solid #888;
+}
+
+div.entry-content tr:last-child td {
+    border-bottom: 1px solid #888;
+}
+
+div.entry-content td:last-child, div.entry-content th:last-child {
+    border-right: 1px solid #888;
+}
+
 /* Post metadata styling */
 div.entry-meta {
 	text-align: right;
