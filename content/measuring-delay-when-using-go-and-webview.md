@@ -205,6 +205,8 @@ This is as expected - more work is happening on the Go side, but the tick is lon
 
 Invoking a Go method from Javascript, and having that Go method change data (by running code) on the Javascript side always takes at least one tick (Javascript loop) - regardless of how long the tick takes. In my measurements this took at least 3 to 5 milliseconds, though these results are likely to vary. The time taken to run the Go code did not slow down or affect the Javascript loop.
 
+It is worth noting that, according to [a comment made by webview's maintainer on a GitHub issue](https://github.com/zserge/webview/issues/92#issuecomment-362796217), this behaviour might be specific to Linux. It would be worth running similar tests on other platforms.
+
 When building an application in Go and using webview for the UI, there are broadly three options:
 
 1. Have most of the application logic in Go, while using webview mostly for updating the DOM;
