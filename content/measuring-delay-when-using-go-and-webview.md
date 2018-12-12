@@ -16,7 +16,7 @@ The impatient may jump to the [conclusion](#conclusion).
 
 I created a simple page with two buttons: one called "Go" which would invoke a Go method to change the value of a variable, and one called "Js" which would change the value of the variable directly.
 
-I then used a [Proxy](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Proxy) object to watch the variable, and measure the time between the button click and the time the variable was changed. The fact I used a Proxy object meant I could not use webview's [Bind](https://github.com/zserge/webview#how-to-communicate-between-native-go-and-web-ui) method to share data between Go and the webview. When you do this webview rewrites the object browser side on change, deleting the Proxy object. So Instead I used Go to run a line of Javascript to change the variable's value.
+I then used a [Proxy](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Proxy) object to watch the variable, and measure the time between the button click and the time the variable was changed. The fact I used a Proxy object meant I could not use webview's [Bind](https://github.com/zserge/webview#how-to-communicate-between-native-go-and-web-ui) method to share data between Go and the webview. When using Bind, webview will rewrite the whole object on change, deleting any Proxy objects you may have inserted in Javascript. So Instead I used Go to run a line of Javascript to change the variable's value.
 
 Here is the Go code. Two things to note:
 
