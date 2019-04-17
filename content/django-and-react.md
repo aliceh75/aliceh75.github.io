@@ -418,6 +418,55 @@ We can now rebuild with `npm run buil-dev` and see the new code in action. Propt
 <a id="use-django-authentication"></a>
 ## Use Django Authentication
 
+One of the advantages of combining Django and React in this way is that we can use Django to authenticate users, rather than having to implement this React side.
+
+Fist we need to add the default Django authentication URLs in `django2react16/urls.py` by adding this line to the `urlpatterns`:
+
+```python
+    path('accounts/', include('django.contrib.auth.urls')),
+```
+
+We also need to create a template for the login form. First create the registration template folder:
+
+```shell
+$ mkdir -p django2react16/frontend/templates/registration
+```
+
+And then add the file `django2react16/frontend/templates/registration/login.html`:
+
+```html
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Django2React16</title>
+</head>
+<body>
+  <h2>Login</h2>
+  <form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit">Login</button>
+  </form>
+</body>
+</html>
+```
+
+Finally we just need to mark the view that serves the React application as requiring login. To do this we're going to add the `@login_required` decorator to the view `index` in `django2react16/frontend/views.py`. The file now looks like:
+
+```python
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import render
+
+
+@login_required
+def index(request):
+    return render(request, 'frontend/index.html')
+```
+
+And that's it - only logged in users can now access our React App. Django provides mechanisms for logging in, resetting passwords, managing users, etc.
+
 <a id="minimal-api-csrf"></a>
 ## Implement a minimal API with CSRF validation
 
