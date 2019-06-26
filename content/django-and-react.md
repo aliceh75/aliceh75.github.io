@@ -1,4 +1,4 @@
-Title: Walkthrough: setting up Django and React project
+Title: Walkthrough: setting up a Django+React project
 Date: 2019-02-06
 Slug: django-react
 Tags: python, django, react
@@ -7,14 +7,14 @@ Summary: For fullstack web developers on small projects that still want a reacti
 
 For fullstack web developers on small projects that still want a reactive single-application interface, it can be usefull to build and serve a React application directly from Django. Here I show how to achieve a minimal setup with the least number of dependencies, and then build on that to include optional but common libraries.
 
-This article is build as a walkthrough. You may want to follow the steps here exactly, just skip around looking at ideas for solving particular problems, and/or look at the source code at [https://github.com/aliceh75/django2react16](https://github.com/aliceh75/django2react16). The article is aimed at Django developers who want to integrate React - as such while all Django steps are included, they may not be explained in detail. The article expects some understanding of the fundamental concepts behind both Django and React, and experience with the command line. The walkthrough uses Django 2 and React 16, and the examples here were run on an Ubuntu 18.04 LTS machine.
+This article is written as a walkthrough. You may want to follow the steps here exactly, just skip around looking at ideas for solving particular problems, and/or look at the source code at [https://github.com/aliceh75/django2react16](https://github.com/aliceh75/django2react16). The article is aimed at Django developers who want to integrate React - as such while all Django steps are included, they may not be explained in detail. The article expects some understanding of the fundamental concepts behind both Django and React, and experience with the command line. The walkthrough uses Django 2 and React 16, and the examples here were run on an Ubuntu 18.04 LTS machine.
 
 There are 5 separate parts:
 
 - Create a [minimal setup](#minimal-setup) that builds and serves a React application from Django;
 - Add [linting and common libraries](#linting-and-common-libraries) to React;
 - Use [Django authentication](#use-django-authentication) to access the React application;
-- Write a [minimal API with CSRF tokens](#minimal-api-csrf);
+- Implement a [minimal API with CSRF tokens](#minimal-api-csrf);
 - Add a [React testing framework](#react-testing) to test our React application.
 
 ## Approach
@@ -28,7 +28,7 @@ The approach taken is to build your React application statically, and serve it v
 
 The project structure will look like this:
 
-```
+```shell
 django2react16/
   Pipfile             # Python dependencies
   package.json        # Javascript dependencies
@@ -52,7 +52,7 @@ To follow the steps exactly you should have Python 3.6, [Pipenv](https://pipenv.
 
 ### Setting up the Django project
 
-I won't go into details about how Django is setup. If you're unsure about these steps you should check the Django documentation. On a shell terminal, and using [Pipenv](https://pipenv.readthedocs.io/en/latest/) for dependency management, the following will setup the project structure as previously described:
+I won't go into details about how Django is setup. If you're unsure about these steps you should check the Django documentation. On a command line shell, and using [Pipenv](https://pipenv.readthedocs.io/en/latest/) for dependency management, the following will setup the project structure as previously described:
 
 ```shell
 $ mkdir django2react16
@@ -95,7 +95,9 @@ $ npm install react react-dom --save
 $ npm install @babel/core @babel/preset-env @babel/preset-react webpack webpack-cli babel-loader --save-dev
 ```
 
-Note that we use `--save` for runtime libraries, and `--save-dev` for build time dependencies. In practice it would work either way. If you run into version issues you may want to check the exact versions of these packages in the Git repository for this article.
+Note that we use `--save` for runtime libraries, and `--save-dev` for build time dependencies. In practice it would work either way.
+
+If you run into version issues you may want to check the exact versions of these packages in the Git repository for this article.
 
 ### Configuring the Javascript build system
 
@@ -305,7 +307,7 @@ So let's start by adding out new dependencies:
 $ npm install @babel/plugin-proposal-class-properties eslint eslint-plugin-react babel-eslint --save-dev
 ```
 
-We need to configure eslint to tell it what style we want. Here I use 2 space indentation, semi-colons at end of instructions, and the default React settings. Create the file `.eslintrc.json`in your project root with the following:
+We need to configure eslint to tell it what style we want. Here I use 2 space indentation, semi-colons at end of instructions, and the default React settings. Create the file `.eslintrc.json` in your project root with the following:
 
 ```json
 {
@@ -382,7 +384,7 @@ To use the PropTypes, we need to tell Babel to compile this new feature. To do t
 To demonstrate PropTypes, we're going to add a single property, `counter`, to our `AppContent` component. The property should be a number and is required. `AppContent.js` now looks like this:
 
 
-```js
+```jsx
  import React from "react";
  import PropTypes from "prop-types";
  
@@ -399,7 +401,7 @@ To demonstrate PropTypes, we're going to add a single property, `counter`, to ou
 
 And we need to add the property from our `App.js`, which now looks like this:
 
-```js
+```jsx
  class App extends React.Component {
    render() {
      return <div>
@@ -704,5 +706,98 @@ In your Django view you would then load the data this way:
 ```
 
 <a id="react-testing"></a>
-
 ## Add a React testing framework
+
+As this article is aimed at Django developers I have not covered writing Django tests - but I will look at writting React tests. Well written components are easy to test. We'll need some new Javascript libraries:
+
+- First we need a testing framework. There a number available out there - [jest](https://jestjs.io/) being a popular one;
+- We need a library to integrate React and Jest, [react-jest](https://www.npmjs.com/package/react-jest);
+- We need a library to help us render React components outside the browser environment, so they can be tested. [react-test-renderer](https://www.npmjs.com/package/react-test-renderer) does that. It's not the most advanced, but it's enough for our use case here, and being part of React is low on dependencies. The official documenation is at [https://reactjs.org/docs/test-renderer.html](https://reactjs.org/docs/test-renderer.html)
+
+So let's install our depdencies:
+
+```shell
+$ npm install jest react-jest react-test-renderer --save-dev
+```
+
+You will need to tell `eslint` we're using `jest` by editng `.eslintrc.json`, and adding a entry for `jest` in the `env` section:
+
+```json
+{
+    "env": {
+       "browser": true,
+       "es6": true,
+       "jest": true
+    },
+    ...
+}
+```
+
+And you should add a new command in the `scripts` section of your `package.json` to run the tests:
+
+```json
+...
+scripts {
+ ...
+ "test": "jest"
+ ...
+}
+```
+
+Now let's write our first test. We'll test our `AppContent` component, and save it in `django2react16/frontend/src/tests/AppContent.test.js`. We'll write two tests: one to check the counter value is displayed, and one to check the `onIncCounter` function is called when the button is clicked. Here is the code for the test:
+
+```javascript
+import React from "react";
+import {create} from "react-test-renderer";
+import AppContent from "../components/AppContent";
+
+describe("AppContent Component", () => {
+  test("It should show the counter value", () => {
+    const component = create(<AppContent counter={12} onIncCounter={() => null} />);
+    const root = component.root;
+
+    expect(root.findByType('p').children.join('')).toBe('Hello World: 12');
+  });
+
+  test("It should call onIncCounter when button is clicked", () => {
+    const onIncCounter = jest.fn();
+    const component = create(<AppContent counter={12} onIncCounter={onIncCounter} />);
+    const root = component.root;
+
+    // Simulate a click
+    root.findByType('button').props.onClick();
+
+    expect(onIncCounter).toHaveBeenCalledTimes(1);
+  });
+});
+```
+
+We can now run the tests by doing:
+
+```shell
+$ npm test
+```
+
+And we'll get an output similar to:
+
+```
+> django2react16@1.0.0 test /home/anselm/projects/code/django2react16
+> jest
+
+ PASS  django2react16/frontend/src/tests/AppContent.test.js
+  AppContent Component
+    ✓ It should show the counter value (19ms)
+    ✓ It should call onIncCounter when button is clicked (2ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       2 passed, 2 total
+Snapshots:   0 total
+Time:        3.221s, estimated 6s
+Ran all test suites.
+```
+
+This shows us the tests that ran, their result and the time it took.
+
+## Conclusion
+
+There are many different approaches to architecturing web applications - this is just one of them, which has been used (and proved useful) in a real life project. The approaches taken here don't necessarily scale (it is aimed at smaller project), but it provides a good starting point for Django developers looking to implement reactive frontent interfaces with React.
