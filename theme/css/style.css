@@ -100,11 +100,27 @@ div.entry-content h2{
     font-weight: normal;
 }
 
+div.entry-content h2:before {
+    content: '# ';
+}
+
 div.entry-content h3 {
     font-size: 18px;
     margin: 10px 0px;
     font-family: "Montserrat", sans-serif;
     font-weight: normal;
+}
+
+div.entry-content h3:before {
+    content: '## ';
+}
+
+div.entry-content h4 {
+    font-size: 16px;
+    margin: 6px 0px 10px;
+    font-family: "Montserrat", sans-serif;
+    font-weight: normal;
+    font-style: italic;
 }
 
 div.entry-content ul {
@@ -199,4 +215,9 @@ div.entry-read-more {
 
 #footer p {
     margin-bottom: 10px;
+}
+
+/* Don't show highlighting errors. Pygments doesn't support jsx well. */
+div.highlight .err {
+    border: none;
 }

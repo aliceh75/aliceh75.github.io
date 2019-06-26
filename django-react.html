@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Alice/Development Notes &mdash; Walkthrough: setting up a Django+React project</title>
+    <meta charset="utf-8"/>
+    <link rel="stylesheet" type="text/css" href="https://aliceh75.github.io/theme/css/style.css"/>
+</head>
+
+<body>
+    <div id="container">
+        <div id="header">
+                <div id="site-title"><a href="https://aliceh75.github.io">Alice/Development Notes</a></div>
+        </div>
+
+        <div id="contents">
+    <div class="post">
+        <div class="entry-meta">
+            <div class="date">Wed 06 February 2019</div>
+            <div class="author">By Alice Heaton</div>
+                <div class="tag-list">
+                        <a href="https://aliceh75.github.io/tag/django" rel="tag">#django</a>
+                        <a href="https://aliceh75.github.io/tag/python" rel="tag">#python</a>
+                        <a href="https://aliceh75.github.io/tag/react" rel="tag">#react</a>
+                </div>
+        </div>
+        <div class="entry-main">
+            <h1 class="entry-title">
+                <a href="https://aliceh75.github.io/django-react" title="Walkthrough: setting up a Django+React project"
+                   rel="bookmark">Walkthrough: setting up a Django+React project</a>
+            </h1>
+            <div class="entry-content">
+                  <p>For fullstack web developers on small projects that still want a reactive single-application interface, it can be usefull to build and serve a React application directly from Django. Here I show how to achieve a minimal setup with the least number of dependencies, and then build on that to include optional but common libraries.</p>
+<p>This article is written as a walkthrough. You may want to follow the steps here exactly, just skip around looking at ideas for solving particular problems, and/or look at the source code at <a href="https://github.com/aliceh75/django2react16">https://github.com/aliceh75/django2react16</a>. The article is aimed at Django developers who want to integrate React - as such while all Django steps are included, they may not be explained in detail. The article expects some understanding of the fundamental concepts behind both Django and React, and experience with the command line. The walkthrough uses Django 2 and React 16, and the examples here were run on an Ubuntu 18.04 LTS machine.</p>
+<p>There are 5 separate parts:</p>
+<ul>
+<li>Create a <a href="#minimal-setup">minimal setup</a> that builds and serves a React application from Django;</li>
+<li>Add <a href="#linting-and-common-libraries">linting and common libraries</a> to React;</li>
+<li>Use <a href="#use-django-authentication">Django authentication</a> to access the React application;</li>
+<li>Implement a <a href="#minimal-api-csrf">minimal API with CSRF tokens</a>;</li>
+<li>Add a <a href="#react-testing">React testing framework</a> to test our React application.</li>
+</ul>
+<h2>Approach</h2>
+<p>The approach taken is to build your React application statically, and serve it via a Django view. This approach means that you can rely on Django authentication, Django CSRF tokens, and serving related files (such as CSS) via Django. It is most suited to projects where the same developers will work both on the backend and the frontend.</p>
+<p><a id='minimal-setup'></a></p>
+<h2>A minimal setup</h2>
+<h3>Initial structure</h3>
+<p>The project structure will look like this:</p>
+<div class="highlight"><pre><span></span>django2react16/
+  Pipfile             <span class="c1"># Python dependencies</span>
+  package.json        <span class="c1"># Javascript dependencies</span>
+  ...
+  django2react16/
+    frontend/
+      src/            <span class="c1"># React code</span>
+        components/   <span class="c1"># React components</span>
+      static/
+        frontend/     <span class="c1"># Where the React application is build</span>
+      templates/
+        frontend/
+          index.html  <span class="c1"># Main template for the page serving the React code</span>
+      views.py        <span class="c1"># View to serve the React frontend</span>
+      urls.py         <span class="c1"># Routing to the React frontend</span>
+      ...
+</pre></div>
+
+
+<h3>Pre-requisites</h3>
+<p>To follow the steps exactly you should have Python 3.6, <a href="https://pipenv.readthedocs.io/en/latest/">Pipenv</a>, <a href="https://nodejs.org/en/">Nodejs</a> and <a href="https://www.npmjs.com/">npm</a> installed.</p>
+<h3>Setting up the Django project</h3>
+<p>I won't go into details about how Django is setup. If you're unsure about these steps you should check the Django documentation. On a command line shell, and using <a href="https://pipenv.readthedocs.io/en/latest/">Pipenv</a> for dependency management, the following will setup the project structure as previously described:</p>
+<div class="highlight"><pre><span></span>$ mkdir django2react16
+$ <span class="nb">cd</span> django2react16
+$ pipenv install <span class="nv">django</span><span class="o">==</span><span class="m">2</span>.1.7 --python<span class="o">=</span><span class="m">3</span>.6
+$ pipenv run django-admin startproject django2react16 .
+$ mkdir django2react16/frontend
+$ pipenv run ./manage.py startapp frontend django2react16/frontend
+$ mkdir -p django2react16/frontend/static/frontend
+$ mkdir -p django2react16/frontend/templates/frontend
+$ mkdir -p django2react16/frontend/src/components
+</pre></div>
+
+
+<p>You may also want to apply Django's initial migrations at this point (this will use sqlite database by default):</p>
+<div class="highlight"><pre><span></span>$ pipenv run ./manage.py migrate
+</pre></div>
+
+
+<h3>Installing the React dependencies</h3>
+<p>We can now add the Javascript dependencies. To initialise the project, run:</p>
+<div class="highlight"><pre><span></span>$ npm init
+</pre></div>
+
+
+<p>This command will create your initial <code>package.json</code>. The defaults are fine, feel free to customise as needed. The main thing is to leave <code>entry point</code> as <code>index.js</code>.</p>
+<p>There exist applications such as <a href="https://github.com/facebook/create-react-app">create-react-app</a> that set up an initial project for you. They tend to add a lot of dependencies that are not strictly required, so I prefer to install things manually. A basic React setup is actually much simpler than a lot of these ready-made applications, templates and tutorials would have you believe. These are the Javascript dependencies we will need:</p>
+<ul>
+<li>For React, we need the main React library <a href="https://www.npmjs.com/package/react">react</a> and the React library that is specific to web environements (as opposed to React native), <a href="https://www.npmjs.com/package/react-dom">react-dom</a> ;</li>
+<li>To translate modern Javascript (<a href="https://en.wikipedia.org/wiki/ES6#6th_Edition_-_ECMAScript_2015">ES6 and beyond</a>) and <a href="https://reactjs.org/docs/introducing-jsx.html">React JSX</a> into Javascript that is supported by browsers, we will need the <a href="https://babeljs.io/">Babel compiler</a>. The dependencies we need are <a href="https://www.npmjs.com/package/@babel/core">@babel/core</a> for the main library, <a href="https://www.npmjs.com/package/@babel/preset-env">@babel/preset-env</a> and <a href="https://www.npmjs.com/package/@babel/preset-react">@babel/preset-react</a> for preset babel configurations that work with React (writting such configurations by hand would be quite a task);</li>
+<li>To package the React application into a file we can serve via the web, we will need <a href="https://webpack.js.org/">Webpack</a>. The dependencies are <a href="https://www.npmjs.com/package/webpack">webpack</a>, <a href="https://www.npmjs.com/package/webpack-cli">webpack-cli</a> and to integrate babel with webpack we need <a href="https://www.npmjs.com/package/babel-loader">babel-loader</a>.</li>
+</ul>
+<p>So, from our project root, we can install those by doing:</p>
+<div class="highlight"><pre><span></span>$ npm install react react-dom --save
+$ npm install @babel/core @babel/preset-env @babel/preset-react webpack webpack-cli babel-loader --save-dev
+</pre></div>
+
+
+<p>Note that we use <code>--save</code> for runtime libraries, and <code>--save-dev</code> for build time dependencies. In practice it would work either way.</p>
+<p>If you run into version issues you may want to check the exact versions of these packages in the Git repository for this article.</p>
+<h3>Configuring the Javascript build system</h3>
+<p>We need a little bit of configuraton. First, we need to tell Babel what presets to use. To do this create a file <code>.babelrc</code> in your project root with the following:</p>
+<div class="highlight"><pre><span></span><span class="p">{</span>
+    <span class="nt">&quot;presets&quot;</span><span class="p">:</span> <span class="p">[</span>
+        <span class="s2">&quot;@babel/preset-env&quot;</span><span class="p">,</span> <span class="s2">&quot;@babel/preset-react&quot;</span>
+    <span class="p">]</span>
+<span class="p">}</span>
+</pre></div>
+
+
+<p>And we need to tell Webpack to use babel. To do this create a file <code>webpack.config.js</code> in your project root with the following:</p>
+<div class="highlight"><pre><span></span><span class="nx">module</span><span class="p">.</span><span class="nx">exports</span> <span class="o">=</span> <span class="p">{</span>
+  <span class="nx">module</span><span class="o">:</span> <span class="p">{</span>
+    <span class="nx">rules</span><span class="o">:</span> <span class="p">[</span>
+      <span class="p">{</span>
+        <span class="nx">test</span><span class="o">:</span> <span class="sr">/\.js$/</span><span class="p">,</span>
+        <span class="nx">exclude</span><span class="o">:</span> <span class="sr">/node_modules/</span><span class="p">,</span>
+        <span class="nx">use</span><span class="o">:</span> <span class="p">{</span>
+          <span class="nx">loader</span><span class="o">:</span> <span class="s2">&quot;babel-loader&quot;</span>
+        <span class="p">}</span>
+      <span class="p">}</span>
+    <span class="p">]</span>
+  <span class="p">}</span>
+<span class="p">};</span>
+</pre></div>
+
+
+<p>Finally we're going to tell npm how to build the application. Open your <code>package.json</code> and edit the <code>script</code> section to add the following commands:</p>
+<div class="highlight"><pre><span></span>  <span class="p">...</span>
+    <span class="s2">&quot;scripts&quot;</span><span class="o">:</span> <span class="p">{</span>
+      <span class="s2">&quot;build-dev&quot;</span><span class="o">:</span> <span class="s2">&quot;webpack --mode development --devtool source-map ./django2react16/frontend/src/index.js --output ./django2react16/frontend/static/frontend/main.js&quot;</span><span class="p">,</span>
+      <span class="s2">&quot;build&quot;</span><span class="o">:</span> <span class="s2">&quot;webpack --mode production ./django2react16/frontend/src/index.js --output ./django2react16/frontend/static/frontend/main.js&quot;</span>
+  <span class="p">},</span>
+  <span class="p">...</span>
+</pre></div>
+
+
+<p>The <code>build</code> command is used for production, while the <code>build-dev</code> command is used for development. Both commands save the build javascript application in <code>django2react16/frontend/static/frontend/main.js</code> (and the dev command will add a source map file along side it).</p>
+<p>Note we're not ready to run that build command yet - we need to put the files in place first.</p>
+<h3>Bootstraping Django side</h3>
+<p>We have a few things to put in place to serve the application. The first thing is the main <code>index.html</code> template file.</p>
+<p>This file is in <code>dango2react16/frontend/templates/frontend/index.html</code> and contains the following:</p>
+<div class="highlight"><pre><span></span>{% load static %}
+<span class="cp">&lt;!DOCTYPE html&gt;</span>
+<span class="p">&lt;</span><span class="nt">html</span><span class="p">&gt;</span>
+<span class="p">&lt;</span><span class="nt">head</span><span class="p">&gt;</span>
+  <span class="p">&lt;</span><span class="nt">meta</span> <span class="na">charset</span><span class="o">=</span><span class="s">&quot;utf-8&quot;</span><span class="p">&gt;</span>
+  <span class="p">&lt;</span><span class="nt">meta</span> <span class="na">name</span><span class="o">=</span><span class="s">&quot;viewport&quot;</span> <span class="na">content</span><span class="o">=</span><span class="s">&quot;width=device-width, initial-scale=1&quot;</span><span class="p">&gt;</span>
+  <span class="p">&lt;</span><span class="nt">title</span><span class="p">&gt;</span>Django2React16<span class="p">&lt;/</span><span class="nt">title</span><span class="p">&gt;</span>
+<span class="p">&lt;/</span><span class="nt">head</span><span class="p">&gt;</span>
+<span class="p">&lt;</span><span class="nt">body</span><span class="p">&gt;</span>
+  <span class="p">&lt;</span><span class="nt">div</span> <span class="na">id</span><span class="o">=</span><span class="s">&quot;app&quot;</span><span class="p">&gt;&lt;/</span><span class="nt">div</span><span class="p">&gt;</span>
+  <span class="p">&lt;</span><span class="nt">script</span> <span class="na">src</span><span class="o">=</span><span class="s">&quot;{% static &#39;frontend/main.js&#39; %}&quot;</span><span class="p">&gt;&lt;/</span><span class="nt">script</span><span class="p">&gt;</span>
+<span class="p">&lt;/</span><span class="nt">body</span><span class="p">&gt;</span>
+<span class="p">&lt;/</span><span class="nt">html</span><span class="p">&gt;</span>
+</pre></div>
+
+
+<p>All it does is create the <code>#app</code> element React is going to bind to, and include our Javascript.</p>
+<p>Next we need to create the view that will serve the file. Create <code>django2react16/frontend/views.py</code> with the following:</p>
+<div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">django.shortcuts</span> <span class="kn">import</span> <span class="n">render</span>
+
+
+<span class="k">def</span> <span class="nf">index</span><span class="p">(</span><span class="n">request</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">render</span><span class="p">(</span><span class="n">request</span><span class="p">,</span> <span class="s1">&#39;frontend/index.html&#39;</span><span class="p">)</span>
+</pre></div>
+
+
+<p>Create <code>dango2react16/frontend/urls.py</code> with the following:</p>
+<div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">django.urls</span> <span class="kn">import</span> <span class="n">path</span>
+
+<span class="kn">from</span> <span class="nn">django2react16.frontend</span> <span class="kn">import</span> <span class="n">views</span>
+
+<span class="n">urlpatterns</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="n">path</span><span class="p">(</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">views</span><span class="o">.</span><span class="n">index</span><span class="p">),</span>
+<span class="p">]</span>
+</pre></div>
+
+
+<p>And in the main <code>urls.py</code> at <code>django2react16/urls.py</code> add the path to the frontend view - your <code>urls.py</code> would look something like:</p>
+<div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">django.contrib</span> <span class="kn">import</span> <span class="n">admin</span>
+<span class="kn">from</span> <span class="nn">django.urls</span> <span class="kn">import</span> <span class="n">include</span><span class="p">,</span> <span class="n">path</span>
+
+<span class="n">urlpatterns</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="n">path</span><span class="p">(</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">include</span><span class="p">(</span><span class="s1">&#39;django2react16.frontend.urls&#39;</span><span class="p">)),</span>
+    <span class="n">path</span><span class="p">(</span><span class="s1">&#39;admin/&#39;</span><span class="p">,</span> <span class="n">admin</span><span class="o">.</span><span class="n">site</span><span class="o">.</span><span class="n">urls</span><span class="p">),</span>
+<span class="p">]</span>
+</pre></div>
+
+
+<p>Finally add the <code>frontend</code> app to your <code>INSTALLED_APPS</code> in settings.py:</p>
+<div class="highlight"><pre><span></span><span class="o">...</span>
+<span class="n">INSTALLED_APPS</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="o">...</span>
+    <span class="s1">&#39;django2react16.frontend&#39;</span>
+<span class="p">]</span>
+</pre></div>
+
+
+<h3>Initial React application</h3>
+<p>Now we're ready to add a basic React application. First we need to create our entry point - <code>index.js</code> which will create the <code>App</code> component and attach it to the <code>#app</code> HTML element we added in our template. So <code>django2react16/frontend/src/index.js</code> would look like this:</p>
+<div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">React</span> <span class="nn">from</span> <span class="s2">&quot;react&quot;</span><span class="p">;</span>
+<span class="kn">import</span> <span class="nn">ReactDOM</span> <span class="nn">from</span> <span class="s2">&quot;react-dom&quot;</span><span class="p">;</span>
+<span class="kn">import</span> <span class="nn">App</span> <span class="nn">from</span> <span class="s2">&quot;./components/App&quot;</span><span class="p">;</span>
+
+<span class="n">const</span> <span class="n">wrapper</span> <span class="o">=</span> <span class="n">document</span><span class="o">.</span><span class="n">getElementById</span><span class="p">(</span><span class="s2">&quot;app&quot;</span><span class="p">);</span>
+<span class="n">wrapper</span> <span class="err">?</span> <span class="n">ReactDOM</span><span class="o">.</span><span class="n">render</span><span class="p">(</span><span class="o">&lt;</span><span class="n">App</span> <span class="o">/&gt;</span><span class="p">,</span> <span class="n">wrapper</span><span class="p">)</span> <span class="p">:</span> <span class="n">null</span><span class="p">;</span>
+</pre></div>
+
+
+<p>Our main <code>App</code> component in <code>django2react16/frontend/src/components/App.js</code> will be like this:</p>
+<div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">React</span> <span class="nn">from</span> <span class="s2">&quot;react&quot;</span><span class="p">;</span>
+<span class="kn">import</span> <span class="nn">AppContent</span> <span class="nn">from</span> <span class="s2">&quot;./AppContent&quot;</span><span class="p">;</span>
+
+<span class="k">class</span> <span class="nc">App</span> <span class="n">extends</span> <span class="n">React</span><span class="o">.</span><span class="n">Component</span> <span class="p">{</span>
+  <span class="n">render</span><span class="p">()</span> <span class="p">{</span>
+    <span class="k">return</span> <span class="o">&lt;</span><span class="n">div</span><span class="o">&gt;</span>
+      <span class="o">&lt;</span><span class="n">h1</span><span class="o">&gt;</span><span class="n">Django2React16</span><span class="err">!</span><span class="o">&lt;/</span><span class="n">h1</span><span class="o">&gt;</span>
+      <span class="o">&lt;</span><span class="n">AppContent</span> <span class="o">/&gt;</span>
+    <span class="o">&lt;/</span><span class="n">div</span><span class="o">&gt;</span><span class="p">;</span>
+  <span class="p">}</span>
+<span class="p">}</span>
+
+<span class="n">export</span> <span class="n">default</span> <span class="n">App</span><span class="p">;</span>
+</pre></div>
+
+
+<p>Note that for the sake of demonstrating importing and using React components I've created a second component, <code>AppContent</code>, used in the main <code>App</code> component. The <code>AppContent</code> component is in <code>dango2react16/frontend/src/components/AppContent.js</code> and looks like this:</p>
+<div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">React</span> <span class="nn">from</span> <span class="s2">&quot;react&quot;</span><span class="p">;</span>
+
+<span class="k">class</span> <span class="nc">AppContent</span> <span class="n">extends</span> <span class="n">React</span><span class="o">.</span><span class="n">Component</span> <span class="p">{</span>
+  <span class="n">render</span><span class="p">()</span> <span class="p">{</span>
+    <span class="k">return</span> <span class="o">&lt;</span><span class="n">div</span><span class="o">&gt;</span><span class="n">Hello</span> <span class="n">World</span><span class="o">&lt;/</span><span class="n">div</span><span class="o">&gt;</span><span class="p">;</span>
+  <span class="p">}</span>
+<span class="p">}</span>
+
+<span class="n">export</span> <span class="n">default</span> <span class="n">AppContent</span><span class="p">;</span>
+</pre></div>
+
+
+<h3>Let's run it!</h3>
+<p>We're done! You should first build the React application by running:</p>
+<div class="highlight"><pre><span></span>$ npm run build-dev
+</pre></div>
+
+
+<p>And you can then start the Django server:</p>
+<div class="highlight"><pre><span></span>$ pipenv run ./manage.py runserver
+</pre></div>
+
+
+<p>You can now navigate to <code>http://localhost:8000</code> and see your brand new React application!</p>
+<h3>Final notes</h3>
+<p>If you're going to commit this to version control, you'll want to ignore the following files:</p>
+<ul>
+<li><code>node_modules</code>, the folder when Javascript dependencies are downloaded;</li>
+<li><code>django2react16/frontend/static/frontend/main.js</code> the generate Javascript application;</li>
+<li><code>django2react16/frontend/static/frontend/main.js.map</code> the source map for the Javascript application.</li>
+</ul>
+<p>As well as usual Django files.</p>
+<p>So your <code>.gitignore</code> would look like:</p>
+<div class="highlight"><pre><span></span><span class="n">db</span><span class="p">.</span><span class="n">sqlite3</span>
+<span class="n">node_modules</span>
+<span class="n">django2react16</span><span class="o">/</span><span class="n">frontend</span><span class="o">/</span><span class="k">static</span><span class="o">/</span><span class="n">frontend</span><span class="o">/</span><span class="n">main</span><span class="p">.</span><span class="n">js</span>
+<span class="n">django2react16</span><span class="o">/</span><span class="n">frontend</span><span class="o">/</span><span class="k">static</span><span class="o">/</span><span class="n">frontend</span><span class="o">/</span><span class="n">main</span><span class="p">.</span><span class="n">js</span><span class="p">.</span><span class="k">map</span>
+</pre></div>
+
+
+<p><a id="linting-and-common-libraries"></a></p>
+<h2>Adding linting and some common libraries to React</h2>
+<p>Linting is useful on many levels - it finds bugs, avoids wasting time on style issues, etc. There are default linting styles for React and I will use those. One of the things the default React linting settings expect are <a href="https://reactjs.org/docs/typechecking-with-proptypes.html">PropTypes</a> - these allow for type checking of component properties, and are a useful debuging tool.</p>
+<p>The default ES6 way to add PropTypes is by adding to your class' prototypes. We can use <a href="https://github.com/tc39/proposal-class-fields">class properties</a> instead. Class properties is (at the time of writing) a new javascript feature still under proposal - however there is a babel plugin to support it, and it's widely used in the React world.</p>
+<p>So let's start by adding out new dependencies:</p>
+<div class="highlight"><pre><span></span>$ npm install @babel/plugin-proposal-class-properties eslint eslint-plugin-react babel-eslint --save-dev
+</pre></div>
+
+
+<p>We need to configure eslint to tell it what style we want. Here I use 2 space indentation, semi-colons at end of instructions, and the default React settings. Create the file <code>.eslintrc.json</code> in your project root with the following:</p>
+<div class="highlight"><pre><span></span><span class="p">{</span>
+    <span class="nt">&quot;env&quot;</span><span class="p">:</span> <span class="p">{</span>
+        <span class="nt">&quot;browser&quot;</span><span class="p">:</span> <span class="kc">true</span><span class="p">,</span>
+        <span class="nt">&quot;es6&quot;</span><span class="p">:</span> <span class="kc">true</span>
+    <span class="p">},</span>
+    <span class="nt">&quot;extends&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;eslint:recommended&quot;</span><span class="p">,</span> <span class="s2">&quot;plugin:react/recommended&quot;</span><span class="p">],</span>
+    <span class="nt">&quot;parser&quot;</span><span class="p">:</span> <span class="s2">&quot;babel-eslint&quot;</span><span class="p">,</span>
+    <span class="nt">&quot;parserOptions&quot;</span><span class="p">:</span> <span class="p">{</span>
+        <span class="nt">&quot;ecmaFeatures&quot;</span><span class="p">:</span> <span class="p">{</span>
+            <span class="nt">&quot;jsx&quot;</span><span class="p">:</span> <span class="kc">true</span>
+        <span class="p">},</span>
+        <span class="nt">&quot;ecmaVersion&quot;</span><span class="p">:</span> <span class="mi">2018</span><span class="p">,</span>
+        <span class="nt">&quot;sourceType&quot;</span><span class="p">:</span> <span class="s2">&quot;module&quot;</span>
+    <span class="p">},</span>
+    <span class="nt">&quot;plugins&quot;</span><span class="p">:</span> <span class="p">[</span>
+        <span class="s2">&quot;react&quot;</span>
+    <span class="p">],</span>
+    <span class="nt">&quot;rules&quot;</span><span class="p">:</span> <span class="p">{</span>
+        <span class="nt">&quot;indent&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;error&quot;</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span>
+        <span class="nt">&quot;linebreak-style&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;error&quot;</span><span class="p">,</span> <span class="s2">&quot;unix&quot;</span><span class="p">],</span>
+        <span class="nt">&quot;semi&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;error&quot;</span><span class="p">,</span> <span class="s2">&quot;always&quot;</span><span class="p">]</span>
+    <span class="p">},</span>
+    <span class="nt">&quot;settings&quot;</span><span class="p">:</span> <span class="p">{</span>
+        <span class="nt">&quot;react&quot;</span><span class="p">:</span> <span class="p">{</span>
+            <span class="nt">&quot;createClass&quot;</span><span class="p">:</span> <span class="s2">&quot;createReactClass&quot;</span><span class="p">,</span>
+            <span class="nt">&quot;pragma&quot;</span><span class="p">:</span> <span class="s2">&quot;React&quot;</span><span class="p">,</span>
+            <span class="nt">&quot;version&quot;</span><span class="p">:</span> <span class="s2">&quot;detect&quot;</span><span class="p">,</span>
+            <span class="nt">&quot;flowVersion&quot;</span><span class="p">:</span> <span class="s2">&quot;0.53&quot;</span>
+        <span class="p">},</span>
+        <span class="nt">&quot;propWrapperFunctions&quot;</span><span class="p">:</span> <span class="p">[</span>
+            <span class="s2">&quot;forbidExtraProps&quot;</span><span class="p">,</span>
+            <span class="p">{</span><span class="nt">&quot;property&quot;</span><span class="p">:</span> <span class="s2">&quot;freeze&quot;</span><span class="p">,</span> <span class="nt">&quot;object&quot;</span><span class="p">:</span> <span class="s2">&quot;Object&quot;</span><span class="p">},</span>
+            <span class="p">{</span><span class="nt">&quot;property&quot;</span><span class="p">:</span> <span class="s2">&quot;myFavoriteWrapper&quot;</span><span class="p">}</span>
+        <span class="p">]</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+
+
+<p>Finally we need to tell <code>npm</code> how to run the linting. To do this, add a <code>lint</code> entry in the <code>scripts</code> section of the file <code>package.json</code>:</p>
+<div class="highlight"><pre><span></span>  <span class="p">...</span>
+  <span class="ss">&quot;scripts&quot;</span><span class="p">:</span> <span class="err">{</span>
+    <span class="p">...</span>
+    <span class="ss">&quot;lint&quot;</span><span class="p">:</span> <span class="ss">&quot;eslint ./django2react16/frontend/src&quot;</span><span class="p">,</span>
+    <span class="p">...</span>
+  <span class="err">}</span>
+  <span class="p">...</span>
+</pre></div>
+
+
+<p>This will lint the javascript files in <code>django2react16/frontend/src</code>. You can test it now by running:</p>
+<div class="highlight"><pre><span></span>$ npm run lint
+</pre></div>
+
+
+<p>If you test this on the <code>minimal-setup</code> branch of the associated Git repository, you will see that it reports linting errors (fixed on the <code>linting-and-common-libraries</code> branch).</p>
+<p>To use the PropTypes, we need to tell Babel to compile this new feature. To do this, edit <code>.babelrc</code> and add "@babel/plugin-proposal-class-properties" as a plugin, like this:</p>
+<div class="highlight"><pre><span></span><span class="err">{</span><span class="w"></span>
+<span class="w">    </span><span class="ss">&quot;presets&quot;</span><span class="err">:</span><span class="w"> </span><span class="o">[</span><span class="n"></span>
+<span class="n">        &quot;@babel/preset-env&quot;, &quot;@babel/preset-react&quot;</span>
+<span class="n">    </span><span class="o">]</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="ss">&quot;plugins&quot;</span><span class="err">:</span><span class="w"> </span><span class="o">[</span><span class="n"></span>
+<span class="n">        &quot;@babel/plugin-proposal-class-properties&quot;</span>
+<span class="n">    </span><span class="o">]</span><span class="w"></span>
+<span class="err">}</span><span class="w"></span>
+</pre></div>
+
+
+<p>To demonstrate PropTypes, we're going to add a single property, <code>counter</code>, to our <code>AppContent</code> component. The property should be a number and is required. <code>AppContent.js</code> now looks like this:</p>
+<div class="highlight"><pre><span></span> <span class="kn">import</span> <span class="nn">React</span> <span class="nn">from</span> <span class="s2">&quot;react&quot;</span><span class="p">;</span>
+ <span class="kn">import</span> <span class="nn">PropTypes</span> <span class="nn">from</span> <span class="s2">&quot;prop-types&quot;</span><span class="p">;</span>
+
+ <span class="k">class</span> <span class="nc">AppContent</span> <span class="n">extends</span> <span class="n">React</span><span class="o">.</span><span class="n">Component</span> <span class="p">{</span>
+   <span class="n">static</span> <span class="n">propTypes</span> <span class="o">=</span> <span class="p">{</span>
+     <span class="n">counter</span><span class="p">:</span> <span class="n">PropTypes</span><span class="o">.</span><span class="n">number</span><span class="o">.</span><span class="n">isRequired</span>
+   <span class="p">};</span>
+
+   <span class="n">render</span><span class="p">()</span> <span class="p">{</span>
+     <span class="k">return</span> <span class="o">&lt;</span><span class="n">div</span><span class="o">&gt;</span><span class="n">Hello</span> <span class="n">World</span><span class="p">:</span> <span class="p">{</span><span class="n">this</span><span class="o">.</span><span class="n">props</span><span class="o">.</span><span class="n">counter</span><span class="p">}</span><span class="o">&lt;/</span><span class="n">div</span><span class="o">&gt;</span><span class="p">;</span>
+   <span class="p">}</span>
+ <span class="p">}</span>
+</pre></div>
+
+
+<p>And we need to add the property from our <code>App.js</code>, which now looks like this:</p>
+<div class="highlight"><pre><span></span> <span class="nv">class</span> <span class="nv">App</span> <span class="nv">extends</span> <span class="nv">React</span>.<span class="nv">Component</span> {
+   <span class="nv">render</span><span class="ss">()</span> {
+     <span class="k">return</span> <span class="o">&lt;</span><span class="nv">div</span><span class="o">&gt;</span>
+       <span class="o">&lt;</span><span class="nv">h1</span><span class="o">&gt;</span><span class="nv">Django2React16</span><span class="o">!&lt;/</span><span class="nv">h1</span><span class="o">&gt;</span>
+       <span class="o">&lt;</span><span class="nv">AppContent</span> <span class="nv">counter</span><span class="o">=</span>{<span class="mi">1</span>} <span class="o">/&gt;</span>
+     <span class="o">&lt;/</span><span class="nv">div</span><span class="o">&gt;</span><span class="c1">;</span>
+   }
+ }
+</pre></div>
+
+
+<p>We can now rebuild with <code>npm run buil-dev</code> and see the new code in action. Proptype validation happens at runtime, and in development mode only. If you were to ommit the <code>counter</code> property for <code>AppContent</code> you would see a runtime error in the browser console.</p>
+<p><a id="use-django-authentication"></a></p>
+<h2>Use Django Authentication</h2>
+<p>One of the advantages of combining Django and React as described in this article is that we can use Django to authenticate users, rather than having to implement this React side.</p>
+<p>Fist we need to add the default Django authentication URLs in <code>django2react16/urls.py</code> by adding this line to the <code>urlpatterns</code>:</p>
+<div class="highlight"><pre><span></span>    <span class="n">path</span><span class="p">(</span><span class="s1">&#39;accounts/&#39;</span><span class="p">,</span> <span class="n">include</span><span class="p">(</span><span class="s1">&#39;django.contrib.auth.urls&#39;</span><span class="p">)),</span>
+</pre></div>
+
+
+<p>We also need to create a template for the login form. First create the registration template folder:</p>
+<div class="highlight"><pre><span></span>$ mkdir -p django2react16/frontend/templates/registration
+</pre></div>
+
+
+<p>And then add the file <code>django2react16/frontend/templates/registration/login.html</code>:</p>
+<div class="highlight"><pre><span></span><span class="cp">&lt;!DOCTYPE html&gt;</span>
+<span class="p">&lt;</span><span class="nt">html</span><span class="p">&gt;</span>
+<span class="p">&lt;</span><span class="nt">head</span><span class="p">&gt;</span>
+  <span class="p">&lt;</span><span class="nt">meta</span> <span class="na">charset</span><span class="o">=</span><span class="s">&quot;utf-8&quot;</span><span class="p">&gt;</span>
+  <span class="p">&lt;</span><span class="nt">meta</span> <span class="na">name</span><span class="o">=</span><span class="s">&quot;viewport&quot;</span> <span class="na">content</span><span class="o">=</span><span class="s">&quot;width=device-width, initial-scale=1&quot;</span><span class="p">&gt;</span>
+  <span class="p">&lt;</span><span class="nt">title</span><span class="p">&gt;</span>Django2React16<span class="p">&lt;/</span><span class="nt">title</span><span class="p">&gt;</span>
+<span class="p">&lt;/</span><span class="nt">head</span><span class="p">&gt;</span>
+<span class="p">&lt;</span><span class="nt">body</span><span class="p">&gt;</span>
+  <span class="p">&lt;</span><span class="nt">h2</span><span class="p">&gt;</span>Login<span class="p">&lt;/</span><span class="nt">h2</span><span class="p">&gt;</span>
+  <span class="p">&lt;</span><span class="nt">form</span> <span class="na">method</span><span class="o">=</span><span class="s">&quot;post&quot;</span><span class="p">&gt;</span>
+    {% csrf_token %}
+    {{ form.as_p }}
+    <span class="p">&lt;</span><span class="nt">button</span> <span class="na">type</span><span class="o">=</span><span class="s">&quot;submit&quot;</span><span class="p">&gt;</span>Login<span class="p">&lt;/</span><span class="nt">button</span><span class="p">&gt;</span>
+  <span class="p">&lt;/</span><span class="nt">form</span><span class="p">&gt;</span>
+<span class="p">&lt;/</span><span class="nt">body</span><span class="p">&gt;</span>
+<span class="p">&lt;/</span><span class="nt">html</span><span class="p">&gt;</span>
+</pre></div>
+
+
+<p>Finally we just need to mark the view that serves the React application as requiring login. To do this we're going to add the <code>@login_required</code> decorator to the view <code>index</code> in <code>django2react16/frontend/views.py</code>. The file now looks like:</p>
+<div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">django.contrib.auth.decorators</span> <span class="kn">import</span> <span class="n">login_required</span>
+<span class="kn">from</span> <span class="nn">django.shortcuts</span> <span class="kn">import</span> <span class="n">render</span>
+
+
+<span class="nd">@login_required</span>
+<span class="k">def</span> <span class="nf">index</span><span class="p">(</span><span class="n">request</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">render</span><span class="p">(</span><span class="n">request</span><span class="p">,</span> <span class="s1">&#39;frontend/index.html&#39;</span><span class="p">)</span>
+</pre></div>
+
+
+<p>And that's it - only logged in users can now access our React App. Django provides mechanisms for logging in, resetting passwords, managing users, etc. To test it, you can add a new super user by doing:</p>
+<div class="highlight"><pre><span></span>$ pipenv run ./manage.py createsuper
+</pre></div>
+
+
+<p>And then navigating to <code>localhost:8000</code> and logging in as that user.</p>
+<p><a id="minimal-api-csrf"></a></p>
+<h2>Implement a minimal API with CSRF validation</h2>
+<h3>CSRF</h3>
+<p>We're now going to add an API with CSRF validation, again relying on Django to provide the CSRF mechanisms.</p>
+<p>When using backend-generated forms, it is normal practice for the bakcend to include the CSRF token as a hidden field in the form. In this case any form would be generated on the frontend, so we need to comunicate the CSRF token differently. We do this by passing it as a cookie. To make sure this happens, you need to add a decorator to the view serving the React app.</p>
+<p>So in <code>django2react16/frontend/views.py</code>, import the following decorator:</p>
+<div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">django.views.decorators.csrf</span> <span class="kn">import</span> <span class="n">ensure_csrf_cookie</span>
+</pre></div>
+
+
+<p>And then decorate the view:</p>
+<div class="highlight"><pre><span></span><span class="nd">@login_required</span>
+<span class="nd">@ensure_csrf_cookie</span>
+<span class="k">def</span> <span class="nf">index</span><span class="p">(</span><span class="n">request</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">render</span><span class="p">(</span><span class="n">request</span><span class="p">,</span> <span class="s1">&#39;frontend/index.html&#39;</span><span class="p">)</span>
+</pre></div>
+
+
+<h3>The API</h3>
+<p>Now to write an API, we'll want to have some data to share. We're going to store, and increase, the counter we created in a previous section. So we're going to create a simple model in <code>django2react16/frontend/models.py</code>:</p>
+<div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">django.db</span> <span class="kn">import</span> <span class="n">models</span>
+
+
+<span class="k">class</span> <span class="nc">Counter</span><span class="p">(</span><span class="n">models</span><span class="o">.</span><span class="n">Model</span><span class="p">):</span>
+    <span class="n">value</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">IntegerField</span><span class="p">()</span>
+</pre></div>
+
+
+<p>To create and apply the migrations for the model run:</p>
+<div class="highlight"><pre><span></span>$ pipenv run ./manage.py makemigrations frontend
+$ pipenv run ./manage.py migrate
+</pre></div>
+
+
+<p>And we're going to create a very basic API. When invoked it will simply increase the value of the given counter by 1, and return the new value. We'll add the API alongside the existing view in <code>django2react16/frontent/views.py</code>:</p>
+<div class="highlight"><pre><span></span><span class="nd">@require_http_methods</span><span class="p">([</span><span class="s2">&quot;POST&quot;</span><span class="p">])</span>
+<span class="nd">@login_required</span>
+<span class="k">def</span> <span class="nf">increase_counter</span><span class="p">(</span><span class="n">request</span><span class="p">,</span> <span class="n">counter_pk</span><span class="p">):</span>
+    <span class="n">counter</span> <span class="o">=</span> <span class="n">Counter</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">pk</span><span class="o">=</span><span class="n">counter_pk</span><span class="p">)</span>
+    <span class="n">counter</span><span class="o">.</span><span class="n">value</span> <span class="o">=</span> <span class="n">counter</span><span class="o">.</span><span class="n">value</span> <span class="o">+</span> <span class="mi">1</span>
+    <span class="n">counter</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+
+    <span class="k">return</span> <span class="n">JsonResponse</span><span class="p">({</span><span class="s1">&#39;value&#39;</span><span class="p">:</span> <span class="n">counter</span><span class="o">.</span><span class="n">value</span><span class="p">})</span>
+</pre></div>
+
+
+<p>The API code should be self-explanatory: only accept logged-in users, only accept POST methods, increase the value of the given counter, and return a JSON object with the new value. Note that Django will automatically force CSRF validation on POST methods, so that is already covered. For the above code to work, you need these new imports in <code>views.py</code>:</p>
+<div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">django.http</span> <span class="kn">import</span> <span class="n">JsonResponse</span>
+<span class="kn">from</span> <span class="nn">django.views.decorators.http</span> <span class="kn">import</span> <span class="n">require_http_methods</span>
+<span class="kn">from</span> <span class="nn">django2react16.frontend.models</span> <span class="kn">import</span> <span class="n">Counter</span>
+</pre></div>
+
+
+<p>And to ensure our API request are routed, add the following to <code>urlpatterns</code> in <code>django2react16/frontend/urls.py</code>:</p>
+<div class="highlight"><pre><span></span><span class="n">path</span><span class="p">(</span><span class="s1">&#39;api/&lt;int:counter_pk&gt;&#39;</span><span class="p">,</span> <span class="n">views</span><span class="o">.</span><span class="n">increase_counter</span><span class="p">)</span>
+</pre></div>
+
+
+<h3>Providing initial data to the React app</h3>
+<p>Each instance of the React app will have it's own counter - we'll create it when the page is loaded, and provide it's primary key to the react app. Let's rewrite the <code>index</code> view in <code>django2react16/frontend/views.py</code>:</p>
+<div class="highlight"><pre><span></span><span class="nd">@login_required</span>
+<span class="nd">@ensure_csrf_cookie</span>
+<span class="k">def</span> <span class="nf">index</span><span class="p">(</span><span class="n">request</span><span class="p">):</span>
+    <span class="n">counter</span> <span class="o">=</span> <span class="n">Counter</span><span class="p">(</span><span class="n">value</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">counter</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">render</span><span class="p">(</span><span class="n">request</span><span class="p">,</span> <span class="s1">&#39;frontend/index.html&#39;</span> <span class="p">{</span>
+        <span class="s1">&#39;counter_pk&#39;</span><span class="p">:</span> <span class="n">counter</span><span class="o">.</span><span class="n">pk</span><span class="p">,</span>
+        <span class="s1">&#39;counter_value&#39;</span><span class="p">:</span> <span class="n">counter</span><span class="o">.</span><span class="n">value</span>
+    <span class="p">})</span>
+</pre></div>
+
+
+<p>In the <code>render</code> call we're passing the primary key and counter value as context - now in the view's template we'll simply store these values as a javascript variables, which will get read when executed in the browser. In <code>django2react16/frontend/templates/frontend/index.html</code> we'll add, before the existing <code>script</code> tag:</p>
+<div class="highlight"><pre><span></span><span class="p">&lt;</span><span class="nt">script</span><span class="p">&gt;</span>
+  <span class="kd">var</span> <span class="nx">counter_pk</span><span class="o">=</span><span class="p">{{</span><span class="nx">counter_pk</span><span class="p">}};</span>
+  <span class="kd">var</span> <span class="nx">counter_value</span><span class="o">=</span><span class="p">{{</span><span class="nx">counter_value</span><span class="p">}};</span>
+<span class="p">&lt;/</span><span class="nt">script</span><span class="p">&gt;</span>
+</pre></div>
+
+
+<p>At this stage you can now reload the application in the browser, and inspect the value of <code>counter_pk</code> in the javascript console. It should increase with every page reload.</p>
+<h3>Using the API from React</h3>
+<p>We're now done with the Python side of things. Let's get to the React side of things. We're going to use the <code>App</code> component's local state to store the counter value (we won't be using any additional third party state management library).</p>
+<p>The state will be initialised during the component's <code>componentDidMount</code> call, and the counter value from the state will be passed down to the <code>AppContent</code> component. We'll also now write a handler on the <code>App</code> component to increase the counter value - making the API call and setting the new counter value when that completes. This handler will also be passed to the <code>AppContent</code> component.</p>
+<p>Remember we need to read the CSRF token, which is stored as a cookie. For that we'll add another dependency, <a href="https://www.npmjs.com/package/js-cookie">js-cookie</a>:</p>
+<div class="highlight"><pre><span></span>$ npm install js-cookie --save
+</pre></div>
+
+
+<p>The API call will be made with the native <a href="https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API">fetch API</a>, and we will use <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise">Promises</a> to handle asynchronous resolution. While both <code>fetch</code> and <code>Promise</code> are native on recent browsers, they may still be missing on older browsers. So we're going to use <a href="https://en.wikipedia.org/wiki/Polyfill_(programming)">Polyfills</a> to ensure that functionality is always available. We'll use <a href="https://www.npmjs.com/package/whatwg-fetch">whatwg-fetch</a> and <a href="https://www.npmjs.com/package/promise-polyfill">promise-polyfill</a>. These need to be installed:</p>
+<div class="highlight"><pre><span></span>$ npm install promise-polyfill whatwg-fetch --save
+</pre></div>
+
+
+<p>And they also need to be loaded when the application starts. We do this in <code>django2react16/frontend/src/index.js</code> simply by importing the libraries before starting React:</p>
+<div class="highlight"><pre><span></span><span class="o">//</span> <span class="n">Promise</span> <span class="n">polyfill</span> <span class="k">for</span> <span class="n">older</span> <span class="n">browsers</span>
+<span class="kn">import</span> <span class="s1">&#39;promise-polyfill/src/polyfill&#39;</span><span class="p">;</span>
+
+<span class="o">//</span> <span class="n">Fetch</span> <span class="n">polyfill</span> <span class="k">for</span> <span class="n">older</span> <span class="n">browsers</span>
+<span class="kn">import</span> <span class="s1">&#39;whatwg-fetch&#39;</span><span class="p">;</span>
+</pre></div>
+
+
+<p>We're now ready to implement our changes to <code>django2react16/frontend/src/components/App.js</code>, which now looks like this:</p>
+<div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">Cookies</span> <span class="nn">from</span> <span class="s2">&quot;js-cookie&quot;</span><span class="p">;</span>
+<span class="kn">import</span> <span class="nn">React</span> <span class="nn">from</span> <span class="s2">&quot;react&quot;</span><span class="p">;</span>
+
+<span class="kn">import</span> <span class="nn">AppContent</span> <span class="nn">from</span> <span class="s2">&quot;./AppContent&quot;</span><span class="p">;</span>
+
+<span class="k">class</span> <span class="nc">App</span> <span class="n">extends</span> <span class="n">React</span><span class="o">.</span><span class="n">Component</span> <span class="p">{</span>
+  <span class="n">state</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="n">counter_value</span><span class="p">:</span> <span class="mi">0</span>
+  <span class="p">}</span>
+
+  <span class="n">render</span><span class="p">()</span> <span class="p">{</span>
+    <span class="k">return</span> <span class="o">&lt;</span><span class="n">div</span><span class="o">&gt;</span>
+      <span class="o">&lt;</span><span class="n">h1</span><span class="o">&gt;</span><span class="n">Django2React16</span><span class="err">!</span><span class="o">&lt;/</span><span class="n">h1</span><span class="o">&gt;</span>
+      <span class="o">&lt;</span><span class="n">AppContent</span>
+        <span class="n">counter</span><span class="o">=</span><span class="p">{</span><span class="n">this</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">counter_value</span><span class="p">}</span>
+        <span class="n">onIncCounter</span><span class="o">=</span><span class="p">{()</span> <span class="o">=&gt;</span> <span class="n">this</span><span class="o">.</span><span class="n">handleIncCounter</span><span class="p">()}</span>
+      <span class="o">/&gt;</span>
+    <span class="o">&lt;/</span><span class="n">div</span><span class="o">&gt;</span><span class="p">;</span>
+  <span class="p">}</span>
+
+  <span class="n">componentDidMount</span><span class="p">()</span> <span class="p">{</span>
+    <span class="n">this</span><span class="o">.</span><span class="n">setState</span><span class="p">({</span><span class="n">counter_value</span><span class="p">:</span> <span class="n">window</span><span class="o">.</span><span class="n">counter_value</span><span class="p">});</span>
+  <span class="p">}</span>
+
+  <span class="n">handleIncCounter</span><span class="p">()</span> <span class="p">{</span>
+    <span class="n">fetch</span><span class="p">(</span><span class="sb">`/api/${window.counter_pk}`</span><span class="p">,</span> <span class="p">{</span>
+      <span class="n">method</span><span class="p">:</span> <span class="s1">&#39;POST&#39;</span><span class="p">,</span>
+      <span class="n">credentials</span><span class="p">:</span> <span class="s1">&#39;include&#39;</span><span class="p">,</span>
+      <span class="n">mode</span><span class="p">:</span> <span class="s1">&#39;same-origin&#39;</span><span class="p">,</span>
+      <span class="n">headers</span><span class="p">:</span> <span class="p">{</span>
+        <span class="s1">&#39;Accept&#39;</span><span class="p">:</span> <span class="s1">&#39;application/json&#39;</span><span class="p">,</span>
+        <span class="s1">&#39;Content-Type&#39;</span><span class="p">:</span> <span class="s1">&#39;application/json&#39;</span><span class="p">,</span>
+        <span class="s1">&#39;X-CSRFToken&#39;</span><span class="p">:</span> <span class="n">Cookies</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;csrftoken&#39;</span><span class="p">)</span>
+      <span class="p">}</span>
+    <span class="p">})</span><span class="o">.</span><span class="n">then</span><span class="p">((</span><span class="n">response</span><span class="p">)</span> <span class="o">=&gt;</span> <span class="p">{</span>
+      <span class="k">if</span> <span class="p">(</span><span class="n">response</span><span class="o">.</span><span class="n">status</span> <span class="o">&gt;=</span> <span class="mi">200</span> <span class="o">&amp;&amp;</span> <span class="n">response</span><span class="o">.</span><span class="n">status</span> <span class="o">&lt;</span> <span class="mi">300</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">return</span> <span class="n">response</span><span class="p">;</span>
+      <span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+        <span class="n">var</span> <span class="n">error</span> <span class="o">=</span> <span class="n">new</span> <span class="n">Error</span><span class="p">(</span><span class="n">response</span><span class="o">.</span><span class="n">statusText</span><span class="p">);</span>
+        <span class="n">error</span><span class="o">.</span><span class="n">response</span> <span class="o">=</span> <span class="n">response</span><span class="p">;</span>
+        <span class="n">throw</span> <span class="n">error</span><span class="p">;</span>
+      <span class="p">}</span>
+    <span class="p">})</span><span class="o">.</span><span class="n">then</span><span class="p">((</span><span class="n">response</span><span class="p">)</span> <span class="o">=&gt;</span> <span class="p">{</span>
+      <span class="k">return</span> <span class="n">response</span><span class="o">.</span><span class="n">json</span><span class="p">();</span>
+    <span class="p">})</span><span class="o">.</span><span class="n">then</span><span class="p">((</span><span class="n">data</span><span class="p">)</span> <span class="o">=&gt;</span> <span class="p">{</span>
+      <span class="n">this</span><span class="o">.</span><span class="n">setState</span><span class="p">({</span><span class="n">counter_value</span><span class="p">:</span> <span class="n">data</span><span class="o">.</span><span class="n">value</span><span class="p">});</span>
+    <span class="p">})</span><span class="o">.</span><span class="n">catch</span><span class="p">((</span><span class="n">error</span><span class="p">)</span> <span class="o">=&gt;</span> <span class="p">{</span>
+      <span class="n">alert</span><span class="p">(</span><span class="n">error</span><span class="p">);</span>
+    <span class="p">});</span>
+  <span class="p">}</span>
+<span class="p">}</span>
+
+<span class="n">export</span> <span class="n">default</span> <span class="n">App</span><span class="p">;</span>
+</pre></div>
+
+
+<p>We now need to add a button in <code>AppContent</code> to increase the counter. When clicked, the button will invoke <code>handleIncCount</code> on the App component, which is passed down as the <code>onIncCounter</code> property. So the <code>AppContent</code> component in <code>django2react16/frontend/src/components/AppContent.js</code> now looks like this:</p>
+<div class="highlight"><pre><span></span><span class="nv">class</span> <span class="nv">AppContent</span> <span class="nv">extends</span> <span class="nv">React</span>.<span class="nv">Component</span> {
+  <span class="nv">static</span> <span class="nv">propTypes</span> <span class="o">=</span> {
+    <span class="nv">counter</span>: <span class="nv">PropTypes</span>.<span class="nv">number</span>.<span class="nv">isRequired</span>,
+    <span class="nv">onIncCounter</span>: <span class="nv">PropTypes</span>.<span class="nv">func</span>.<span class="nv">isRequired</span>
+  }<span class="c1">;</span>
+
+  <span class="nv">render</span><span class="ss">()</span> {
+    <span class="k">return</span> <span class="o">&lt;</span><span class="nv">div</span><span class="o">&gt;</span>
+      <span class="o">&lt;</span><span class="nv">p</span><span class="o">&gt;</span><span class="nv">Hello</span> <span class="nv">World</span>: {<span class="nv">this</span>.<span class="nv">props</span>.<span class="nv">counter</span>}<span class="o">&lt;/</span><span class="nv">p</span><span class="o">&gt;</span>
+      <span class="o">&lt;</span><span class="nv">button</span> <span class="nv">onClick</span><span class="o">=</span>{<span class="nv">this</span>.<span class="nv">props</span>.<span class="nv">onIncCounter</span>}<span class="o">&gt;</span><span class="nv">Increment</span><span class="o">&lt;/</span><span class="nv">button</span><span class="o">&gt;</span>
+    <span class="o">&lt;/</span><span class="nv">div</span><span class="o">&gt;</span><span class="c1">;</span>
+  }
+}
+</pre></div>
+
+
+<p>That's it. You can now rebuild your React code with:</p>
+<div class="highlight"><pre><span></span>$ npm run build-dev
+</pre></div>
+
+
+<p>And reload the page, and try the new functionality.</p>
+<h3>Sending data to the API</h3>
+<p>In this simple example we didn't send any data to the API - all we needed was the counter pk which was provided in the URL. In a more complex scenario where you want to send data to the API, one way of doing this is using JSON. You can add a <code>body</code> field to the <code>fetch</code> call, and store JSON in it, eg:</p>
+<div class="highlight"><pre><span></span><span class="nv">fetch</span><span class="ss">(</span><span class="nv">url</span>, {
+    <span class="nv">method</span>: <span class="s1">&#39;</span><span class="s">POST</span><span class="s1">&#39;</span>,
+    <span class="nv">credentials</span>: <span class="s1">&#39;</span><span class="s">include</span><span class="s1">&#39;</span>,
+    <span class="nv">mode</span>: <span class="s1">&#39;</span><span class="s">same-origin</span><span class="s1">&#39;</span>,
+    <span class="nv">headers</span>: {
+      <span class="s1">&#39;</span><span class="s">Accept</span><span class="s1">&#39;</span>: <span class="s1">&#39;</span><span class="s">application/json</span><span class="s1">&#39;</span>,
+      <span class="s1">&#39;</span><span class="s">Content-Type</span><span class="s1">&#39;</span>: <span class="s1">&#39;</span><span class="s">application/json</span><span class="s1">&#39;</span>,
+      <span class="s1">&#39;</span><span class="s">X-CSRFToken</span><span class="s1">&#39;</span>: <span class="nv">Cookies</span>.<span class="nv">get</span><span class="ss">(</span><span class="s1">&#39;</span><span class="s">csrftoken</span><span class="s1">&#39;</span><span class="ss">)</span>
+    },
+    <span class="nv">body</span>: <span class="nv">JSON</span>.<span class="nv">stringify</span><span class="ss">(</span><span class="nv">data</span><span class="ss">)</span>
+  }<span class="ss">)</span><span class="c1">;</span>
+</pre></div>
+
+
+<p>In your Django view you would then load the data this way:</p>
+<div class="highlight"><pre><span></span>    <span class="n">data</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">request</span><span class="o">.</span><span class="n">body</span><span class="p">)</span>
+</pre></div>
+
+
+<p><a id="react-testing"></a></p>
+<h2>Add a React testing framework</h2>
+<p>As this article is aimed at Django developers I have not covered writing Django tests - but I will look at writting React tests. Well written components are easy to test. We'll need some new Javascript libraries:</p>
+<ul>
+<li>First we need a testing framework. There a number available out there - <a href="https://jestjs.io/">jest</a> being a popular one;</li>
+<li>We need a library to integrate React and Jest, <a href="https://www.npmjs.com/package/react-jest">react-jest</a>;</li>
+<li>We need a library to help us render React components outside the browser environment, so they can be tested. <a href="https://www.npmjs.com/package/react-test-renderer">react-test-renderer</a> does that. It's not the most advanced, but it's enough for our use case here, and being part of React is low on dependencies. The official documenation is at <a href="https://reactjs.org/docs/test-renderer.html">https://reactjs.org/docs/test-renderer.html</a></li>
+</ul>
+<p>So let's install our depdencies:</p>
+<div class="highlight"><pre><span></span>$ npm install jest react-jest react-test-renderer --save-dev
+</pre></div>
+
+
+<p>You will need to tell <code>eslint</code> we're using <code>jest</code> by editng <code>.eslintrc.json</code>, and adding a entry for <code>jest</code> in the <code>env</code> section:</p>
+<div class="highlight"><pre><span></span><span class="p">{</span>
+    <span class="nt">&quot;env&quot;</span><span class="p">:</span> <span class="p">{</span>
+       <span class="nt">&quot;browser&quot;</span><span class="p">:</span> <span class="kc">true</span><span class="p">,</span>
+       <span class="nt">&quot;es6&quot;</span><span class="p">:</span> <span class="kc">true</span><span class="p">,</span>
+       <span class="nt">&quot;jest&quot;</span><span class="p">:</span> <span class="kc">true</span>
+    <span class="p">},</span>
+    <span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+
+
+<p>And you should add a new command in the <code>scripts</code> section of your <code>package.json</code> to run the tests:</p>
+<div class="highlight"><pre><span></span><span class="err">...</span>
+<span class="err">scripts</span> <span class="p">{</span>
+ <span class="err">...</span>
+ <span class="nt">&quot;test&quot;</span><span class="p">:</span> <span class="s2">&quot;jest&quot;</span>
+ <span class="err">...</span>
+<span class="p">}</span>
+</pre></div>
+
+
+<p>Now let's write our first test. We'll test our <code>AppContent</code> component, and save it in <code>django2react16/frontend/src/tests/AppContent.test.js</code>. We'll write two tests: one to check the counter value is displayed, and one to check the <code>onIncCounter</code> function is called when the button is clicked. Here is the code for the test:</p>
+<div class="highlight"><pre><span></span><span class="kr">import</span> <span class="nx">React</span> <span class="nx">from</span> <span class="s2">&quot;react&quot;</span><span class="p">;</span>
+<span class="kr">import</span> <span class="p">{</span><span class="nx">create</span><span class="p">}</span> <span class="nx">from</span> <span class="s2">&quot;react-test-renderer&quot;</span><span class="p">;</span>
+<span class="kr">import</span> <span class="nx">AppContent</span> <span class="nx">from</span> <span class="s2">&quot;../components/AppContent&quot;</span><span class="p">;</span>
+
+<span class="nx">describe</span><span class="p">(</span><span class="s2">&quot;AppContent Component&quot;</span><span class="p">,</span> <span class="p">()</span> <span class="p">=&gt;</span> <span class="p">{</span>
+  <span class="nx">test</span><span class="p">(</span><span class="s2">&quot;It should show the counter value&quot;</span><span class="p">,</span> <span class="p">()</span> <span class="p">=&gt;</span> <span class="p">{</span>
+    <span class="kr">const</span> <span class="nx">component</span> <span class="o">=</span> <span class="nx">create</span><span class="p">(</span><span class="o">&lt;</span><span class="nx">AppContent</span> <span class="nx">counter</span><span class="o">=</span><span class="p">{</span><span class="mi">12</span><span class="p">}</span> <span class="nx">onIncCounter</span><span class="o">=</span><span class="p">{()</span> <span class="p">=&gt;</span> <span class="kc">null</span><span class="p">}</span> <span class="o">/&gt;</span><span class="p">);</span>
+    <span class="kr">const</span> <span class="nx">root</span> <span class="o">=</span> <span class="nx">component</span><span class="p">.</span><span class="nx">root</span><span class="p">;</span>
+
+    <span class="nx">expect</span><span class="p">(</span><span class="nx">root</span><span class="p">.</span><span class="nx">findByType</span><span class="p">(</span><span class="s1">&#39;p&#39;</span><span class="p">).</span><span class="nx">children</span><span class="p">.</span><span class="nx">join</span><span class="p">(</span><span class="s1">&#39;&#39;</span><span class="p">)).</span><span class="nx">toBe</span><span class="p">(</span><span class="s1">&#39;Hello World: 12&#39;</span><span class="p">);</span>
+  <span class="p">});</span>
+
+  <span class="nx">test</span><span class="p">(</span><span class="s2">&quot;It should call onIncCounter when button is clicked&quot;</span><span class="p">,</span> <span class="p">()</span> <span class="p">=&gt;</span> <span class="p">{</span>
+    <span class="kr">const</span> <span class="nx">onIncCounter</span> <span class="o">=</span> <span class="nx">jest</span><span class="p">.</span><span class="nx">fn</span><span class="p">();</span>
+    <span class="kr">const</span> <span class="nx">component</span> <span class="o">=</span> <span class="nx">create</span><span class="p">(</span><span class="o">&lt;</span><span class="nx">AppContent</span> <span class="nx">counter</span><span class="o">=</span><span class="p">{</span><span class="mi">12</span><span class="p">}</span> <span class="nx">onIncCounter</span><span class="o">=</span><span class="p">{</span><span class="nx">onIncCounter</span><span class="p">}</span> <span class="o">/&gt;</span><span class="p">);</span>
+    <span class="kr">const</span> <span class="nx">root</span> <span class="o">=</span> <span class="nx">component</span><span class="p">.</span><span class="nx">root</span><span class="p">;</span>
+
+    <span class="c1">// Simulate a click</span>
+    <span class="nx">root</span><span class="p">.</span><span class="nx">findByType</span><span class="p">(</span><span class="s1">&#39;button&#39;</span><span class="p">).</span><span class="nx">props</span><span class="p">.</span><span class="nx">onClick</span><span class="p">();</span>
+
+    <span class="nx">expect</span><span class="p">(</span><span class="nx">onIncCounter</span><span class="p">).</span><span class="nx">toHaveBeenCalledTimes</span><span class="p">(</span><span class="mi">1</span><span class="p">);</span>
+  <span class="p">});</span>
+<span class="p">});</span>
+</pre></div>
+
+
+<p>We can now run the tests by doing:</p>
+<div class="highlight"><pre><span></span>$ npm <span class="nb">test</span>
+</pre></div>
+
+
+<p>And we'll get an output similar to:</p>
+<div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">django2react16</span><span class="mf">@1.0.0</span> <span class="n">test</span> <span class="o">/</span><span class="n">home</span><span class="o">/</span><span class="n">anselm</span><span class="o">/</span><span class="n">projects</span><span class="o">/</span><span class="n">code</span><span class="o">/</span><span class="n">django2react16</span>
+<span class="o">&gt;</span> <span class="n">jest</span>
+
+ <span class="n">PASS</span>  <span class="n">django2react16</span><span class="o">/</span><span class="n">frontend</span><span class="o">/</span><span class="n">src</span><span class="o">/</span><span class="n">tests</span><span class="o">/</span><span class="n">AppContent</span><span class="p">.</span><span class="n">test</span><span class="p">.</span><span class="n">js</span>
+  <span class="n">AppContent</span> <span class="n">Component</span>
+    <span class="err">✓</span> <span class="n">It</span> <span class="n">should</span> <span class="n">show</span> <span class="n">the</span> <span class="n">counter</span> <span class="n">value</span> <span class="p">(</span><span class="mi">19</span><span class="n">ms</span><span class="p">)</span>
+    <span class="err">✓</span> <span class="n">It</span> <span class="n">should</span> <span class="n">call</span> <span class="n">onIncCounter</span> <span class="n">when</span> <span class="n">button</span> <span class="n">is</span> <span class="n">clicked</span> <span class="p">(</span><span class="mi">2</span><span class="n">ms</span><span class="p">)</span>
+
+<span class="n">Test</span> <span class="nl">Suites</span><span class="p">:</span> <span class="mi">1</span> <span class="n">passed</span><span class="p">,</span> <span class="mi">1</span> <span class="n">total</span>
+<span class="nl">Tests</span><span class="p">:</span>       <span class="mi">2</span> <span class="n">passed</span><span class="p">,</span> <span class="mi">2</span> <span class="n">total</span>
+<span class="nl">Snapshots</span><span class="p">:</span>   <span class="mi">0</span> <span class="n">total</span>
+<span class="nl">Time</span><span class="p">:</span>        <span class="mf">3.221</span><span class="n">s</span><span class="p">,</span> <span class="n">estimated</span> <span class="mi">6</span><span class="n">s</span>
+<span class="n">Ran</span> <span class="n">all</span> <span class="n">test</span> <span class="n">suites</span><span class="p">.</span>
+</pre></div>
+
+
+<p>This shows us the tests that ran, their result and the time it took.</p>
+<h2>Conclusion</h2>
+<p>There are many different approaches to architecturing web applications - this is just one of them, which has been used (and proved useful) in a real life project. The approaches taken here don't necessarily scale (it is aimed at smaller project), but it provides a good starting point for Django developers looking to implement reactive frontent interfaces with React.</p>
+            </div>
+        </div>
+    </div>
+        </div>
+
+        <div id="footer">
+            <p>Alice online: <a href="https://github.com/aliceh75">GitHub</a> <a href="https://gitlab.com/aliceh75">GitLab</a> <a href="https://twitter.com/aliceheaton75">Twitter</a></p>
+            <p>Site generated by <a href="https://pelican.readthedocs.org">Pelican</a>, theme loosely based on <a href="https://github.com/tbunnyman/pelican-chunk">Chunk</a></p>
+            <p>All content by Alice Heaton, licensed under a <a rel="license" href="https://creativecommons.org/licenses/by-sa/4.0/">Creative Commons Attribution-ShareAlike 4.0 International License</a>
+               <a rel="license" href="https://creativecommons.org/licenses/by-sa/4.0/"><img alt="Creative Commons Licence" style="border-width:0" src="https://i.creativecommons.org/l/by-sa/4.0/80x15.png" /></a>
+            </p>
+        </div>
+    </div>
+</body>
+</html>
